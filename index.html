@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>360 Invaders</title>
+</head>
+
+<body>
+  <div id="app"></div>
+  <div id="ui-layer">
+    <div id="score">Score: 0</div>
+    <div id="start-screen">
+      <h1>360 INVADERS</h1>
+      <p>Press SPACE to Start</p>
+      <p>Arrow Keys to Rotate | Space to Shoot</p>
+    </div>
+    <div id="game-over-screen" class="hidden">
+      <h1>GAME OVER</h1>
+      <p id="final-score">Score: 0</p>
+      <p>Press SPACE to Restart</p>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>
