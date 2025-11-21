@@ -5,21 +5,47 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>360 Invaders</title>
+  <title>360 Invaders Ver.2</title>
 </head>
 
 <body>
   <div id="app"></div>
   <div id="ui-layer">
-    <div id="score">Score: 0</div>
+    <!-- HUD -->
+    <div id="hud">
+      <div id="score">Score: 0</div>
+      <div id="lives">Lives: ❤️❤️❤️</div>
+      <div id="wave">Wave: 1</div>
+      <div id="combo" style="display: none;">Combo: 0x</div>
+      <div id="weapon">Weapon: Standard</div>
+      <div id="powerups" style="display: none;"></div>
+    </div>
+
+    <!-- Start Screen -->
     <div id="start-screen">
       <h1>360 INVADERS</h1>
+      <h2>Ver.2</h2>
       <p>Press SPACE to Start</p>
-      <p>Arrow Keys to Rotate | Space to Shoot</p>
+      <div class="instructions">
+        <h3>Controls:</h3>
+        <p>← → Arrow Keys: Rotate</p>
+        <p>↑ ↓ Arrow Keys: Move Forward/Backward</p>
+        <p>SPACE: Shoot</p>
+        <p>1/2/3: Switch Weapons</p>
+        <h3>New Features:</h3>
+        <p>❤️ 3 Lives System</p>
+        <p>🌊 Progressive Waves</p>
+        <p>⚡ Power-Ups (Rapid Fire, Spread Shot, Shield, Speed, Score 2x)</p>
+        <p>🔥 Combo Multiplier System</p>
+        <p>🔫 Multiple Weapon Types</p>
+      </div>
     </div>
+
+    <!-- Game Over Screen -->
     <div id="game-over-screen" class="hidden">
       <h1>GAME OVER</h1>
       <p id="final-score">Score: 0</p>
+      <div id="game-stats"></div>
       <p>Press SPACE to Restart</p>
     </div>
   </div>

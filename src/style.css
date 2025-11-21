@@ -41,22 +41,81 @@ body {
   text-shadow: 0 0 10px #0ff;
 }
 
-#score {
+/* HUD */
+#hud {
   position: absolute;
   top: 20px;
   left: 20px;
-  font-size: 24px;
+  font-size: 18px;
   font-weight: bold;
-  color: #0ff;
+  text-align: left;
+  pointer-events: none;
 }
 
+#hud > div {
+  margin-bottom: 10px;
+}
+
+#score {
+  font-size: 24px;
+  color: #0ff;
+  text-shadow: 0 0 10px #0ff;
+}
+
+#lives {
+  font-size: 20px;
+  color: #ff0066;
+}
+
+#wave {
+  font-size: 22px;
+  color: #ffffff;
+  text-shadow: 0 0 10px #ffffff;
+}
+
+#combo {
+  font-size: 24px;
+  font-weight: bold;
+  text-shadow: 0 0 20px currentColor;
+  animation: pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+#weapon {
+  font-size: 18px;
+  color: #ffaa00;
+}
+
+#powerups {
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid #00ff00;
+  border-radius: 5px;
+  max-width: 250px;
+}
+
+#powerups > div {
+  margin: 5px 0;
+  font-size: 16px;
+  text-shadow: 0 0 10px currentColor;
+}
+
+/* Screens */
 #start-screen, #game-over-screen {
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.9);
   padding: 40px;
   border: 2px solid #0ff;
   border-radius: 10px;
   box-shadow: 0 0 20px #0ff;
   pointer-events: auto;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
 .hidden {
@@ -65,12 +124,50 @@ body {
 
 h1 {
   font-size: 48px;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
   color: #f0f;
   text-shadow: 0 0 20px #f0f;
 }
 
+h2 {
+  font-size: 32px;
+  margin-top: 0;
+  margin-bottom: 20px;
+  color: #00ff00;
+  text-shadow: 0 0 15px #00ff00;
+}
+
+h3 {
+  font-size: 24px;
+  margin-top: 20px;
+  margin-bottom: 10px;
+  color: #ffaa00;
+  text-shadow: 0 0 10px #ffaa00;
+}
+
 p {
+  font-size: 18px;
+  margin: 8px 0;
+}
+
+.instructions {
+  text-align: left;
+  margin-top: 20px;
+  padding: 20px;
+  background: rgba(0, 255, 255, 0.1);
+  border: 1px solid #0ff;
+  border-radius: 5px;
+}
+
+.instructions p {
+  font-size: 16px;
+  margin: 5px 0;
+  color: #ffffff;
+}
+
+#game-stats {
+  margin: 20px 0;
   font-size: 20px;
-  margin: 10px 0;
+  color: #ffaa00;
+  text-shadow: 0 0 10px #ffaa00;
 }

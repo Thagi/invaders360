@@ -4,6 +4,9 @@ import { Player } from './Player.js';
 import { BulletManager } from './BulletManager.js';
 import { EnemyManager } from './EnemyManager.js';
 import { ParticleManager } from './ParticleManager.js';
+import { WaveManager } from './WaveManager.js';
+import { PowerUpManager } from './PowerUpManager.js';
+import { ComboManager } from './ComboManager.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
@@ -48,7 +51,10 @@ export class Game {
         this.bulletManager = new BulletManager(this.scene);
         this.enemyManager = new EnemyManager(this.scene, this.bulletManager);
         this.particleManager = new ParticleManager(this.scene);
+        this.powerUpManager = new PowerUpManager(this.scene);
+        this.comboManager = new ComboManager();
         this.player = new Player(this.scene, this.bulletManager);
+        this.waveManager = new WaveManager(this.enemyManager);
 
         // Post-processing
         this.composer = new EffectComposer(this.renderer);
@@ -64,6 +70,8 @@ export class Game {
         this.clock = new THREE.Clock();
         this.isPlaying = false;
         this.score = 0;
+        this.lives = 3;
+        this.maxLives = 3;
 
         window.addEventListener('resize', this.onWindowResize.bind(this));
 
@@ -86,7 +94,9 @@ export class Game {
     restart() {
         // Reset game state
         this.score = 0;
+        this.lives = 3;
         this.updateScore();
+        this.updateLives();
         document.getElementById('game-over-screen').classList.add('hidden');
 
         // Clear enemies
@@ -96,10 +106,17 @@ export class Game {
         this.enemyManager.enemies = [];
 
         // Clear bullets
-        for (const bullet of this.bulletManager.bullets) {
-            this.scene.remove(bullet.mesh);
-        }
-        this.bulletManager.bullets = [];
+        this.bulletManager.clear();
+
+        // Clear power-ups
+        this.powerUpManager.clear();
+
+        // Reset combo
+        this.comboManager.reset();
+
+        // Reset wave manager
+        this.waveManager.currentWave = 0;
+        this.waveManager.enemiesKilled = 0;
 
         this.start();
     }
@@ -107,6 +124,8 @@ export class Game {
     start() {
         this.isPlaying = true;
         console.log('Game started');
+        this.waveManager.startNextWave(); // Start wave 1
+        this.updateUI();
         this.animate();
     }
 
@@ -131,21 +150,33 @@ export class Game {
 
         // Update game logic here
         if (this.player) {
-            this.player.update(delta);
+            this.player.update(delta, this.powerUpManager);
         }
         if (this.bulletManager) {
             this.bulletManager.update(delta);
         }
-        if (this.enemyManager) {
+        if (this.enemyManager && !this.waveManager.isInTransition()) {
             this.enemyManager.update(delta, this.player);
         }
         if (this.particleManager) {
             this.particleManager.update(delta);
         }
+        if (this.powerUpManager) {
+            const playerPos = this.player ? this.player.getPosition() : null;
+            this.powerUpManager.update(delta, playerPos);
+        }
+        if (this.comboManager) {
+            this.comboManager.update(delta);
+        }
+        if (this.waveManager) {
+            this.waveManager.update(delta);
+        }
 
         if (this.bulletManager && this.enemyManager) {
             this.checkCollisions();
         }
+
+        this.updateUI();
 
         // this.renderer.render(this.scene, this.camera);
         this.composer.render();
@@ -172,35 +203,60 @@ export class Game {
                 if (dist < 1.5) { // Approximate radius sum
                     // Hit!
                     if (enemy.type === 'boss') {
-                        enemy.hp--;
+                        enemy.hp -= (bullet.damage || 1);
                         this.particleManager.explode(enemyPos, 5, 0xffaa00);
 
                         // Remove bullet
                         this.scene.remove(bullet.mesh);
+                        if (bullet.geometry) bullet.geometry.dispose();
                         bullets.splice(i, 1);
 
                         if (enemy.hp <= 0) {
-                            this.score += 500;
+                            // Boss destroyed
+                            this.comboManager.onEnemyHit();
+                            const multiplier = this.comboManager.getMultiplier();
+                            const scoreMultiplier = this.powerUpManager.hasMultiplier() ? 2 : 1;
+                            const baseScore = 500;
+                            const finalScore = Math.floor(baseScore * multiplier * scoreMultiplier);
+
+                            this.score += finalScore;
                             this.updateScore();
                             this.particleManager.explode(enemyPos, 30, 0xffaa00);
+
+                            // Spawn power-up
+                            this.powerUpManager.trySpawn(enemyPos);
+
                             this.scene.remove(enemy.mesh);
                             enemies.splice(j, 1);
+                            this.waveManager.onEnemyKilled();
                         }
                         break;
                     } else {
-                        this.score += 100;
+                        // Normal enemy destroyed
+                        this.comboManager.onEnemyHit();
+                        const multiplier = this.comboManager.getMultiplier();
+                        const scoreMultiplier = this.powerUpManager.hasMultiplier() ? 2 : 1;
+                        const baseScore = 100;
+                        const finalScore = Math.floor(baseScore * multiplier * scoreMultiplier);
+
+                        this.score += finalScore;
                         this.updateScore();
 
                         // Explosion
                         this.particleManager.explode(enemyPos, 15, 0xff0000);
 
+                        // Spawn power-up
+                        this.powerUpManager.trySpawn(enemyPos);
+
                         // Remove bullet
                         this.scene.remove(bullet.mesh);
+                        if (bullet.geometry) bullet.geometry.dispose();
                         bullets.splice(i, 1);
 
                         // Remove enemy
                         this.scene.remove(enemy.mesh);
                         enemies.splice(j, 1);
+                        this.waveManager.onEnemyKilled();
 
                         break; // Bullet hit something, stop checking this bullet
                     }
@@ -212,32 +268,50 @@ export class Game {
         for (let i = enemies.length - 1; i >= 0; i--) {
             const enemy = enemies[i];
             if (enemy.radius < this.player.radius) { // Enemy reached player's current radius
-                this.gameOver();
+                this.takeDamage();
+                // Remove the enemy that caused damage
+                this.scene.remove(enemy.mesh);
+                enemies.splice(i, 1);
             }
         }
 
         // Enemy Bullets vs Player
-        // Player position is at (radius=8, angle=player.angle)
-        // But player rotates. Player mesh position is handled by pivot.
-        // Easier to check distance from bullet to player mesh world position.
-        // Player mesh is at local (8, 0, 0) inside pivot.
-        // Pivot rotation is player.angle.
-        // So player world pos is polarToCartesian(8, player.angle).
-
-        const playerPos = new THREE.Vector3(
-            this.player.radius * Math.cos(this.player.angle),
-            this.player.radius * Math.sin(this.player.angle),
-            0
-        );
+        const playerPos = this.player.getPosition();
 
         for (let i = bullets.length - 1; i >= 0; i--) {
             const bullet = bullets[i];
             if (bullet.isEnemy) {
                 const bulletPos = bullet.mesh.position;
                 if (bulletPos.distanceTo(playerPos) < 1.5) {
-                    this.gameOver();
+                    this.takeDamage();
+                    // Remove the bullet
+                    this.scene.remove(bullet.mesh);
+                    if (bullet.geometry) bullet.geometry.dispose();
+                    bullets.splice(i, 1);
                 }
             }
+        }
+    }
+
+    takeDamage() {
+        if (this.player.isInvulnerable()) return;
+
+        // Check for shield
+        if (this.powerUpManager.consumeShield()) {
+            this.particleManager.explode(this.player.getPosition(), 20, 0x00ff00);
+            return;
+        }
+
+        this.lives--;
+        this.updateLives();
+        this.comboManager.reset(); // Reset combo on damage
+        this.particleManager.explode(this.player.getPosition(), 25, 0xff0000);
+
+        if (this.lives <= 0) {
+            this.gameOver();
+        } else {
+            // Make player invulnerable temporarily
+            this.player.makeInvulnerable();
         }
     }
 
@@ -245,9 +319,84 @@ export class Game {
         document.getElementById('score').innerText = `Score: ${this.score}`;
     }
 
+    updateLives() {
+        const livesEl = document.getElementById('lives');
+        if (livesEl) {
+            livesEl.innerText = `Lives: ${'❤️'.repeat(this.lives)}${'🖤'.repeat(this.maxLives - this.lives)}`;
+        }
+    }
+
+    updateUI() {
+        // Update score
+        this.updateScore();
+
+        // Update lives
+        this.updateLives();
+
+        // Update wave
+        const waveEl = document.getElementById('wave');
+        if (waveEl) {
+            if (this.waveManager.isInTransition()) {
+                waveEl.innerText = `Wave ${this.waveManager.currentWave} Complete!`;
+                waveEl.style.color = '#00ff00';
+            } else {
+                waveEl.innerText = `Wave: ${this.waveManager.currentWave}`;
+                waveEl.style.color = '#ffffff';
+            }
+        }
+
+        // Update combo
+        const comboEl = document.getElementById('combo');
+        if (comboEl) {
+            const combo = this.comboManager.getCombo();
+            const multiplier = this.comboManager.getMultiplier();
+            if (combo > 0) {
+                comboEl.innerText = `Combo: ${combo}x (${multiplier.toFixed(1)}x score)`;
+                comboEl.style.display = 'block';
+
+                // Color based on multiplier
+                if (multiplier >= 5) comboEl.style.color = '#ff0080';
+                else if (multiplier >= 3) comboEl.style.color = '#ff00ff';
+                else if (multiplier >= 2) comboEl.style.color = '#ffaa00';
+                else comboEl.style.color = '#ffff00';
+            } else {
+                comboEl.style.display = 'none';
+            }
+        }
+
+        // Update weapon
+        const weaponEl = document.getElementById('weapon');
+        if (weaponEl) {
+            weaponEl.innerText = `Weapon: ${this.player.weapons[this.player.currentWeapon].name}`;
+        }
+
+        // Update power-ups
+        const powerupsEl = document.getElementById('powerups');
+        if (powerupsEl) {
+            const active = this.powerUpManager.getActivePowerUps();
+            if (active.length > 0) {
+                powerupsEl.innerHTML = active.map(p => {
+                    const time = p.timeRemaining === Infinity ? '∞' : p.timeRemaining.toFixed(1);
+                    return `<div style="color: #${p.config.color.toString(16)}">${p.config.icon} ${p.config.name} (${time}s)</div>`;
+                }).join('');
+                powerupsEl.style.display = 'block';
+            } else {
+                powerupsEl.style.display = 'none';
+            }
+        }
+    }
+
     gameOver() {
         this.isPlaying = false;
         document.getElementById('game-over-screen').classList.remove('hidden');
         document.getElementById('final-score').innerText = `Score: ${this.score}`;
+
+        const statsEl = document.getElementById('game-stats');
+        if (statsEl) {
+            statsEl.innerHTML = `
+                Wave Reached: ${this.waveManager.currentWave}<br>
+                Max Combo: ${this.comboManager.getMaxCombo()}x
+            `;
+        }
     }
 }

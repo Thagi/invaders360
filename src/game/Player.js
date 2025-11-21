@@ -11,6 +11,39 @@ export class Player {
         this.minRadius = 3; // Minimum distance from center
         this.maxRadius = 8; // Maximum distance from center (game over boundary)
 
+        // Weapon system
+        this.currentWeapon = 'STANDARD';
+        this.weapons = {
+            STANDARD: {
+                name: 'Standard',
+                cooldown: 200,
+                damage: 1,
+                bulletSpeed: 20,
+                bulletSize: 0.5
+            },
+            MACHINE_GUN: {
+                name: 'Machine Gun',
+                cooldown: 100,
+                damage: 0.7,
+                bulletSpeed: 25,
+                bulletSize: 0.3
+            },
+            CANNON: {
+                name: 'Cannon',
+                cooldown: 500,
+                damage: 3,
+                bulletSpeed: 15,
+                bulletSize: 1.2
+            }
+        };
+
+        // Invulnerability
+        this.invulnerable = false;
+        this.invulnerabilityTime = 0;
+        this.invulnerabilityDuration = 2.0; // 2 seconds
+        this.flashInterval = 0.1;
+        this.flashTimer = 0;
+
         // Create Player Mesh
         // Simple triangle/arrow shape
         const geometry = new THREE.ConeGeometry(1, 3, 3);
@@ -38,6 +71,7 @@ export class Player {
         };
 
         this.setupInput();
+        this.lastShootTime = 0;
     }
 
     setupInput() {
@@ -48,6 +82,9 @@ export class Player {
                 case 'ArrowUp': this.keys.up = true; break;
                 case 'ArrowDown': this.keys.down = true; break;
                 case 'Space': this.keys.shoot = true; break;
+                case 'Digit1': this.currentWeapon = 'STANDARD'; break;
+                case 'Digit2': this.currentWeapon = 'MACHINE_GUN'; break;
+                case 'Digit3': this.currentWeapon = 'CANNON'; break;
             }
         });
 
@@ -62,21 +99,40 @@ export class Player {
         });
     }
 
-    update(dt) {
+    update(dt, powerUpManager) {
+        // Update invulnerability
+        if (this.invulnerable) {
+            this.invulnerabilityTime += dt;
+            this.flashTimer += dt;
+
+            if (this.flashTimer >= this.flashInterval) {
+                this.mesh.visible = !this.mesh.visible;
+                this.flashTimer = 0;
+            }
+
+            if (this.invulnerabilityTime >= this.invulnerabilityDuration) {
+                this.invulnerable = false;
+                this.mesh.visible = true;
+            }
+        }
+
+        // Apply speed boost if active
+        const speedMultiplier = powerUpManager && powerUpManager.hasSpeedBoost() ? 1.5 : 1.0;
+
         // Rotation (left/right)
         if (this.keys.left) {
-            this.angle += this.rotationSpeed * dt;
+            this.angle += this.rotationSpeed * speedMultiplier * dt;
         }
         if (this.keys.right) {
-            this.angle -= this.rotationSpeed * dt;
+            this.angle -= this.rotationSpeed * speedMultiplier * dt;
         }
 
         // Radial movement (forward/backward)
         if (this.keys.up) {
-            this.radius += this.radialSpeed * dt;
+            this.radius += this.radialSpeed * speedMultiplier * dt;
         }
         if (this.keys.down) {
-            this.radius -= this.radialSpeed * dt;
+            this.radius -= this.radialSpeed * speedMultiplier * dt;
         }
 
         // Clamp radius to valid range
@@ -87,15 +143,44 @@ export class Player {
 
         // Shooting
         if (this.keys.shoot) {
-            // Simple cooldown or just shoot every frame? 
-            // Let's add a cooldown
-            if (!this.lastShootTime || Date.now() - this.lastShootTime > 200) {
-                this.bulletManager.shoot(this.angle, this.radius);
+            const weapon = this.weapons[this.currentWeapon];
+            let cooldown = weapon.cooldown;
+
+            // Apply rapid fire power-up
+            if (powerUpManager && powerUpManager.hasRapidFire()) {
+                cooldown *= 0.5; // 2x fire rate
+            }
+
+            if (!this.lastShootTime || Date.now() - this.lastShootTime > cooldown) {
+                // Check for spread shot
+                if (powerUpManager && powerUpManager.hasSpreadShot()) {
+                    this.bulletManager.shootSpread(this.angle, this.radius, weapon);
+                } else {
+                    this.bulletManager.shoot(this.angle, this.radius, false, weapon);
+                }
                 this.lastShootTime = Date.now();
             }
         }
 
         // Update rotation
         this.pivot.rotation.z = this.angle;
+    }
+
+    makeInvulnerable() {
+        this.invulnerable = true;
+        this.invulnerabilityTime = 0;
+        this.flashTimer = 0;
+    }
+
+    isInvulnerable() {
+        return this.invulnerable;
+    }
+
+    getPosition() {
+        return new THREE.Vector3(
+            this.radius * Math.cos(this.angle),
+            this.radius * Math.sin(this.angle),
+            0
+        );
     }
 }

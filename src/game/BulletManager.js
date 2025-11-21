@@ -8,14 +8,14 @@ export class BulletManager {
         this.speed = 20; // Units per second
         this.maxRadius = 60; // Despawn distance
 
-        // Reuse geometry and material
-        this.geometry = new THREE.BoxGeometry(0.5, 1, 0.5);
+        // Materials
         this.material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
         this.enemyMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff }); // Purple for enemy bullets
     }
 
     shootAt(startPos, targetPos) {
-        const mesh = new THREE.Mesh(this.geometry, this.enemyMaterial);
+        const geometry = new THREE.BoxGeometry(0.5, 1, 0.5);
+        const mesh = new THREE.Mesh(geometry, this.enemyMaterial);
         mesh.position.copy(startPos);
 
         // Calculate direction
@@ -32,13 +32,30 @@ export class BulletManager {
             mesh,
             velocity, // Vector3
             isEnemy: true,
-            life: 5.0 // Seconds to live
+            life: 5.0, // Seconds to live
+            damage: 1
         });
     }
 
-    shoot(angle, startRadius, isEnemy = false) {
+    shootSpread(angle, startRadius, weapon = null) {
+        // Shoot 3 bullets in a spread pattern
+        const spreadAngle = Math.PI / 12; // 15 degrees spread
+        this.shoot(angle - spreadAngle, startRadius, false, weapon);
+        this.shoot(angle, startRadius, false, weapon);
+        this.shoot(angle + spreadAngle, startRadius, false, weapon);
+    }
+
+    shoot(angle, startRadius, isEnemy = false, weapon = null) {
+        const weaponConfig = weapon || {
+            bulletSpeed: this.speed,
+            bulletSize: 0.5,
+            damage: 1
+        };
+
         const material = isEnemy ? this.enemyMaterial : this.material;
-        const mesh = new THREE.Mesh(this.geometry, material);
+        const size = weaponConfig.bulletSize || 0.5;
+        const geometry = new THREE.BoxGeometry(size, size * 2, size);
+        const mesh = new THREE.Mesh(geometry, material);
 
         // Set initial position
         const pos = polarToCartesian(startRadius, angle);
@@ -55,7 +72,9 @@ export class BulletManager {
             angle,
             radius: startRadius,
             isEnemy,
-            velocity: isEnemy ? -15 : this.speed // Enemy bullets move inward
+            velocity: isEnemy ? -15 : (weaponConfig.bulletSpeed || this.speed),
+            damage: weaponConfig.damage || 1,
+            geometry // Store for cleanup
         });
     }
 
@@ -69,6 +88,7 @@ export class BulletManager {
                 bullet.life -= dt;
                 if (bullet.life <= 0) {
                     this.scene.remove(bullet.mesh);
+                    if (bullet.geometry) bullet.geometry.dispose();
                     this.bullets.splice(i, 1);
                     continue;
                 }
@@ -76,7 +96,7 @@ export class BulletManager {
                 if (bullet.isEnemy) {
                     bullet.radius += bullet.velocity * dt; // Velocity is negative for inward
                 } else {
-                    bullet.radius += this.speed * dt;
+                    bullet.radius += bullet.velocity * dt;
                 }
 
                 // Update position
@@ -86,9 +106,18 @@ export class BulletManager {
                 // Remove if out of bounds or hit center
                 if (bullet.radius > this.maxRadius || bullet.radius < 0) {
                     this.scene.remove(bullet.mesh);
+                    if (bullet.geometry) bullet.geometry.dispose();
                     this.bullets.splice(i, 1);
                 }
             }
         }
+    }
+
+    clear() {
+        for (const bullet of this.bullets) {
+            this.scene.remove(bullet.mesh);
+            if (bullet.geometry) bullet.geometry.dispose();
+        }
+        this.bullets = [];
     }
 }
