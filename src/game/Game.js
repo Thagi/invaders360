@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { TunnelBackground } from './TunnelBackground.js';
+import { UpgradeManager } from './UpgradeManager.js';
 import { Player } from './Player.js';
 
 import { BulletManager } from './BulletManager.js';
@@ -47,11 +49,32 @@ export class Game {
         // const gridHelper = new THREE.GridHelper(100, 100);
         // this.scene.add(gridHelper);
 
-        // Game Over Boundary Visualization
-        const boundaryGeometry = new THREE.CircleGeometry(8, 64);
-        const boundaryMaterial = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.05 }); // Cyan filled circle (subtle)
-        const boundaryMesh = new THREE.Mesh(boundaryGeometry, boundaryMaterial);
-        this.scene.add(boundaryMesh);
+        // Player boundary visualization - gradient ring
+        // Player boundary visualization - Simple Ring
+        const boundaryRadius = 8;
+        const segments = 64;
+
+        const geometry = new THREE.BufferGeometry();
+        const positions = [];
+
+        for (let i = 0; i <= segments; i++) {
+            const angle = (i / segments) * Math.PI * 2;
+            const x = Math.cos(angle) * boundaryRadius;
+            const y = Math.sin(angle) * boundaryRadius;
+            positions.push(x, y, 0);
+        }
+
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+
+        const material = new THREE.LineBasicMaterial({
+            color: 0x00ffff, // Cyan
+            transparent: true,
+            opacity: 0.3
+        });
+
+        this.boundaryMesh = new THREE.LineLoop(geometry, material);
+        this.scene.add(this.boundaryMesh);
+        this.boundaryMesh = this.boundaryMesh;
 
         this.bulletManager = new BulletManager(this.scene);
         this.enemyManager = new EnemyManager(this.scene, this.bulletManager);
@@ -61,8 +84,10 @@ export class Game {
         this.specialAbility = new SpecialAbility(this.scene, () => this.activateBomb());
         this.soundManager = new SoundManager();
         this.backgroundManager = new BackgroundManager(this.scene);
+        this.tunnelBackground = new TunnelBackground(this.scene);
         this.obstacleManager = new ObstacleManager(this.scene);
         this.player = new Player(this.scene, this.bulletManager);
+        this.upgradeManager = new UpgradeManager(this.player, this);
         this.waveManager = new WaveManager(this.enemyManager);
         this.stageBoss = null; // Current stage boss
 
@@ -80,6 +105,9 @@ export class Game {
         bloomPass.radius = 0;
         this.composer.addPass(bloomPass);
 
+        // Bind wave completion to upgrade screen
+        this.waveManager.onWaveComplete = this.showUpgradeScreen.bind(this);
+
         this.clock = new THREE.Clock();
         this.isPlaying = false;
         this.score = 0;
@@ -87,6 +115,7 @@ export class Game {
         this.maxLives = 3;
         this.screenFlashAlpha = 0; // For bomb flash effect
         this.cameraShake = { x: 0, y: 0, intensity: 0, duration: 0 }; // Screen shake
+        this.useTunnel = true; // Toggle tunnel background
 
         this.inputCooldown = 0;
         this.isDying = false; // Flag for death animation
@@ -174,6 +203,9 @@ export class Game {
         this.updateScore();
         this.updateLives();
         document.getElementById('game-over-screen').classList.add('hidden');
+
+        // Reset upgrades
+        if (this.upgradeManager) this.upgradeManager.reset();
 
         // Clear enemies
         // Clear enemies
@@ -372,6 +404,9 @@ export class Game {
             this.backgroundManager.update(delta);
             // Boss mode background effect
             this.backgroundManager.setBossMode(this.stageBoss !== null);
+        }
+        if (this.useTunnel && this.tunnelBackground) {
+            this.tunnelBackground.update(delta);
         }
         if (this.obstacleManager) {
             this.obstacleManager.update(effectiveDelta); // Time slow affects obstacles too
@@ -1031,5 +1066,47 @@ export class Game {
 
         // Grant bomb charge
         this.specialAbility.addCharge();
+    }
+
+    showUpgradeScreen() {
+        // Pause game
+        this.isPlaying = false;
+        this.clock.stop();
+
+        const upgradeScreen = document.getElementById('upgrade-screen');
+        const optionsContainer = upgradeScreen.querySelector('.upgrade-options');
+        optionsContainer.innerHTML = ''; // Clear previous options
+
+        // Get random upgrades
+        const upgrades = this.upgradeManager.getRandomUpgrades(3);
+
+        upgrades.forEach(upgrade => {
+            const card = document.createElement('div');
+            card.className = 'upgrade-card';
+            card.innerHTML = `
+                <div class="upgrade-icon" style="color: ${upgrade.color}">${upgrade.icon}</div>
+                <h3>${upgrade.name}</h3>
+                <p>${upgrade.description}</p>
+            `;
+
+            card.addEventListener('click', () => {
+                this.upgradeManager.applyUpgrade(upgrade.id);
+                this.closeUpgradeScreen();
+            });
+
+            optionsContainer.appendChild(card);
+        });
+
+        upgradeScreen.classList.remove('hidden');
+    }
+
+    closeUpgradeScreen() {
+        const upgradeScreen = document.getElementById('upgrade-screen');
+        upgradeScreen.classList.add('hidden');
+
+        // Resume game
+        this.isPlaying = true;
+        this.clock.start();
+        this.waveManager.startNextWave();
     }
 }

@@ -38,6 +38,27 @@ export class BulletManager {
         });
     }
 
+    fire(position, velocity, isEnemy = false, color = 0xffff00, damage = 1, size = 0.5) {
+        const material = isEnemy ? this.enemyMaterial : new THREE.MeshBasicMaterial({ color: color });
+        const mesh = new THREE.Mesh(this.baseGeometry, material);
+        mesh.scale.set(size, size, size);
+        mesh.position.copy(position);
+
+        // Rotate to face velocity direction
+        const angle = Math.atan2(velocity.y, velocity.x);
+        mesh.rotation.z = angle - Math.PI / 2;
+
+        this.scene.add(mesh);
+
+        this.bullets.push({
+            mesh,
+            velocity, // Vector3
+            isEnemy,
+            life: 3.0, // Seconds to live
+            damage
+        });
+    }
+
     shootSpread(angle, startRadius, weapon = null) {
         // Shoot 3 bullets in a spread pattern
         const spreadAngle = Math.PI / 12; // 15 degrees spread

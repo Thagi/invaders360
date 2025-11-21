@@ -16,26 +16,37 @@ export class Player {
         this.weapons = {
             STANDARD: {
                 name: 'Standard',
-                cooldown: 200,
+                cooldown: 0.15,
                 damage: 1,
-                bulletSpeed: 20,
-                bulletSize: 0.5
+                bulletSpeed: 30,
+                bulletSize: 0.5,
+                color: 0xffff00
             },
-            MACHINE_GUN: {
-                name: 'Machine Gun',
-                cooldown: 100,
-                damage: 0.7,
+            SCATTER: {
+                name: 'Scatter',
+                cooldown: 0.4,
+                damage: 0.8,
                 bulletSpeed: 25,
-                bulletSize: 0.3
+                bulletSize: 0.4,
+                count: 3,
+                spread: 0.2,
+                color: 0xffff00
             },
-            CANNON: {
-                name: 'Cannon',
-                cooldown: 500,
-                damage: 3,
-                bulletSpeed: 15,
-                bulletSize: 1.2
+            RAPID: {
+                name: 'Rapid',
+                cooldown: 0.08,
+                damage: 0.6,
+                bulletSpeed: 35,
+                bulletSize: 0.3,
+                color: 0xffff00
             }
         };
+
+        // Upgrade multipliers
+        this.fireRateMultiplier = 1.0;
+        this.moveSpeedMultiplier = 1.0;
+        this.bulletSizeMultiplier = 1.0;
+        this.damageMultiplier = 1.0;
 
         // Invulnerability
         this.invulnerable = false;
@@ -119,54 +130,106 @@ export class Player {
             }
         }
 
-        // Apply speed boost if active
-        const speedMultiplier = powerUpManager && powerUpManager.hasSpeedBoost() ? 1.5 : 1.0;
+        // Rotation movement (A/D or Left/Right)
+        let moveSpeed = 3.0 * this.moveSpeedMultiplier;
 
-        // Rotation (left/right)
+        // Speed boost power-up
+        if (powerUpManager && powerUpManager.hasSpeedBoost()) {
+            moveSpeed *= 1.5;
+        }
+
         if (this.keys.left) {
-            this.angle += this.rotationSpeed * speedMultiplier * dt;
+            this.angle += moveSpeed * dt;
         }
         if (this.keys.right) {
-            this.angle -= this.rotationSpeed * speedMultiplier * dt;
+            this.angle -= moveSpeed * dt;
         }
 
         // Radial movement (forward/backward)
         if (this.keys.up) {
-            this.radius += this.radialSpeed * speedMultiplier * dt;
+            this.radius += this.radialSpeed * moveSpeed * dt;
         }
         if (this.keys.down) {
-            this.radius -= this.radialSpeed * speedMultiplier * dt;
+            this.radius -= this.radialSpeed * moveSpeed * dt;
         }
 
         // Clamp radius to valid range
         this.radius = Math.max(this.minRadius, Math.min(this.maxRadius, this.radius));
 
-        // Update mesh position based on current radius
-        this.mesh.position.x = this.radius;
+        // Update position based on angle and radius
+        this.mesh.position.x = Math.cos(this.angle) * this.radius;
+        this.mesh.position.y = Math.sin(this.angle) * this.radius;
+        this.mesh.rotation.z = this.angle - Math.PI / 2; // Point inward
 
         // Shooting
         if (this.keys.shoot) {
-            const weapon = this.weapons[this.currentWeapon];
-            let cooldown = weapon.cooldown;
-
-            // Apply rapid fire power-up
-            if (powerUpManager && powerUpManager.hasRapidFire()) {
-                cooldown *= 0.5; // 2x fire rate
-            }
-
-            if (!this.lastShootTime || Date.now() - this.lastShootTime > cooldown) {
-                // Check for spread shot
-                if (powerUpManager && powerUpManager.hasSpreadShot()) {
-                    this.bulletManager.shootSpread(this.angle, this.radius, weapon);
-                } else {
-                    this.bulletManager.shoot(this.angle, this.radius, false, weapon);
-                }
-                this.lastShootTime = Date.now();
-            }
+            this.shoot(powerUpManager);
         }
 
-        // Update rotation
-        this.pivot.rotation.z = this.angle;
+        // Cooldown
+        if (this.shootCooldown > 0) {
+            this.shootCooldown -= dt;
+        }
+    }
+
+    shoot(powerUpManager) {
+        if (this.shootCooldown > 0) return;
+
+        const weapon = this.weapons[this.currentWeapon];
+
+        // Apply fire rate multiplier (higher multiplier = lower cooldown)
+        let cooldown = weapon.cooldown / this.fireRateMultiplier;
+
+        // Rapid fire power-up
+        if (powerUpManager && powerUpManager.hasRapidFire()) {
+            cooldown *= 0.5;
+        }
+
+        this.shootCooldown = cooldown;
+
+        // Calculate bullet properties with upgrades
+        const damage = weapon.damage * this.damageMultiplier;
+        const size = weapon.bulletSize * this.bulletSizeMultiplier;
+
+        if (weapon.name === 'Scatter') {
+            // Scatter shot logic
+            for (let i = 0; i < weapon.count; i++) {
+                const spreadAngle = (i - (weapon.count - 1) / 2) * weapon.spread;
+                const bulletAngle = this.angle + spreadAngle; // Shoot outward + spread
+
+                const velocity = new THREE.Vector3(
+                    Math.cos(bulletAngle) * weapon.bulletSpeed,
+                    Math.sin(bulletAngle) * weapon.bulletSpeed,
+                    0
+                );
+
+                this.bulletManager.fire(
+                    this.mesh.position.clone(),
+                    velocity,
+                    false, // isEnemy
+                    weapon.color,
+                    damage,
+                    size
+                );
+            }
+        } else {
+            // Single shot logic
+            const bulletAngle = this.angle; // Shoot outward
+            const velocity = new THREE.Vector3(
+                Math.cos(bulletAngle) * weapon.bulletSpeed,
+                Math.sin(bulletAngle) * weapon.bulletSpeed,
+                0
+            );
+
+            this.bulletManager.fire(
+                this.mesh.position.clone(),
+                velocity,
+                false, // isEnemy
+                weapon.color,
+                damage,
+                size
+            );
+        }
     }
 
     makeInvulnerable() {
@@ -200,6 +263,5 @@ export class Player {
         this.mesh.visible = true;
 
         // Reset weapon
-        this.currentWeapon = 'STANDARD';
     }
 }

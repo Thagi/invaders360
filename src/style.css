@@ -200,6 +200,63 @@ body {
   pointer-events: auto;
 }
 
+/* Upgrade Screen */
+.upgrade-content {
+  background: rgba(0, 0, 0, 0.9);
+  padding: 40px;
+  border: 2px solid #0ff;
+  border-radius: 10px;
+  box-shadow: 0 0 20px #0ff;
+  pointer-events: auto;
+  max-width: 800px;
+  text-align: center;
+}
+
+.upgrade-options {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 30px;
+}
+
+.upgrade-card {
+  background: rgba(0, 255, 255, 0.1);
+  border: 2px solid #0ff;
+  border-radius: 8px;
+  padding: 20px;
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.upgrade-card:hover {
+  transform: scale(1.05);
+  background: rgba(0, 255, 255, 0.2);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+}
+
+.upgrade-icon {
+  font-size: 48px;
+  margin-bottom: 15px;
+}
+
+.upgrade-card h3 {
+  margin: 0 0 10px 0;
+  color: #0ff;
+  font-size: 20px;
+}
+
+.upgrade-card p {
+  margin: 0;
+  font-size: 14px;
+  color: #ccc;
+  line-height: 1.4;
+}
+
 .game-over-content h1 {
   margin: 0 0 20px 0;
 }
