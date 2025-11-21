@@ -38,15 +38,34 @@ export class PowerUpManager {
                 color: 0xffa500,
                 duration: 15.0,
                 icon: '×2'
+            },
+            TIME_SLOW: {
+                name: 'Time Slow',
+                color: 0x00ddff,
+                duration: 10.0,
+                icon: '⏱️'
+            },
+            MAGNET: {
+                name: 'Magnet',
+                color: 0xaa00ff,
+                duration: 15.0,
+                icon: '🧲'
+            },
+            INVINCIBILITY: {
+                name: 'Invincible',
+                color: 0xffffff,
+                duration: 5.0,
+                icon: '✨'
             }
         };
 
         this.spawnChance = 0.2; // 20% chance on enemy death
         this.orbitSpeed = 0.3;
-        this.approachSpeed = 0.5;
+        this.approachSpeed = 2.0; // Much faster approach (was 0.5)
 
         // Reusable geometry
-        this.geometry = new THREE.OctahedronGeometry(1, 0);
+        // Reusable geometry
+        this.geometry = new THREE.IcosahedronGeometry(1.2, 0);
     }
 
     trySpawn(position) {
@@ -63,7 +82,7 @@ export class PowerUpManager {
         const config = this.types[type];
         const material = new THREE.MeshBasicMaterial({
             color: config.color,
-            wireframe: true
+            wireframe: false // Solid for visibility
         });
         const mesh = new THREE.Mesh(this.geometry, material);
 
@@ -136,6 +155,10 @@ export class PowerUpManager {
             powerUp.mesh.rotation.x += dt * 2;
             powerUp.mesh.rotation.y += dt * 3;
 
+            // Pulse effect
+            const scale = 1 + Math.sin(now * 0.005) * 0.2;
+            powerUp.mesh.scale.set(scale, scale, scale);
+
             // Check collection
             if (playerPos && powerUp.mesh.position.distanceTo(playerPos) < 2) {
                 this.collect(powerUp.type);
@@ -170,6 +193,18 @@ export class PowerUpManager {
 
     hasMultiplier() {
         return this.activePowerUps.has('MULTIPLIER');
+    }
+
+    hasTimeSlow() {
+        return this.activePowerUps.has('TIME_SLOW');
+    }
+
+    hasMagnet() {
+        return this.activePowerUps.has('MAGNET');
+    }
+
+    hasInvincibility() {
+        return this.activePowerUps.has('INVINCIBILITY');
     }
 
     getActivePowerUps() {

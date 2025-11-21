@@ -8,14 +8,15 @@ export class BulletManager {
         this.speed = 20; // Units per second
         this.maxRadius = 60; // Despawn distance
 
-        // Materials
+        // Reusable geometry
+        this.baseGeometry = new THREE.BoxGeometry(1, 2, 1); // Base size, scale later
         this.material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
         this.enemyMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff }); // Purple for enemy bullets
     }
 
     shootAt(startPos, targetPos) {
-        const geometry = new THREE.BoxGeometry(0.5, 1, 0.5);
-        const mesh = new THREE.Mesh(geometry, this.enemyMaterial);
+        const mesh = new THREE.Mesh(this.baseGeometry, this.enemyMaterial);
+        mesh.scale.set(0.5, 0.5, 0.5); // Scale down to default size
         mesh.position.copy(startPos);
 
         // Calculate direction
@@ -54,8 +55,9 @@ export class BulletManager {
 
         const material = isEnemy ? this.enemyMaterial : this.material;
         const size = weaponConfig.bulletSize || 0.5;
-        const geometry = new THREE.BoxGeometry(size, size * 2, size);
-        const mesh = new THREE.Mesh(geometry, material);
+
+        const mesh = new THREE.Mesh(this.baseGeometry, material);
+        mesh.scale.set(size, size, size); // Scale based on config
 
         // Set initial position
         const pos = polarToCartesian(startRadius, angle);
@@ -73,8 +75,8 @@ export class BulletManager {
             radius: startRadius,
             isEnemy,
             velocity: isEnemy ? -15 : (weaponConfig.bulletSpeed || this.speed),
-            damage: weaponConfig.damage || 1,
-            geometry // Store for cleanup
+            damage: weaponConfig.damage || 1
+            // No geometry to dispose
         });
     }
 
@@ -88,7 +90,7 @@ export class BulletManager {
                 bullet.life -= dt;
                 if (bullet.life <= 0) {
                     this.scene.remove(bullet.mesh);
-                    if (bullet.geometry) bullet.geometry.dispose();
+                    // Geometry is shared, do not dispose
                     this.bullets.splice(i, 1);
                     continue;
                 }
@@ -106,7 +108,7 @@ export class BulletManager {
                 // Remove if out of bounds or hit center
                 if (bullet.radius > this.maxRadius || bullet.radius < 0) {
                     this.scene.remove(bullet.mesh);
-                    if (bullet.geometry) bullet.geometry.dispose();
+                    // Geometry is shared, do not dispose
                     this.bullets.splice(i, 1);
                 }
             }
@@ -116,7 +118,7 @@ export class BulletManager {
     clear() {
         for (const bullet of this.bullets) {
             this.scene.remove(bullet.mesh);
-            if (bullet.geometry) bullet.geometry.dispose();
+            // Geometry is shared, do not dispose
         }
         this.bullets = [];
     }

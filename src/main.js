@@ -1,5 +1,7 @@
 import './style.css'
 import { Game } from './game/Game.js'
 
-const game = new Game();
-
+window.addEventListener('DOMContentLoaded', () => {
+    const game = new Game();
+    game.setupUIEventListeners();
+});

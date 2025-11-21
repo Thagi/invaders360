@@ -20,6 +20,10 @@ export class ComboManager {
         this.lastHitTime = Date.now();
     }
 
+    addHit() {
+        this.onEnemyHit();
+    }
+
     update(dt) {
         if (this.combo > 0) {
             this.comboTimer += dt;

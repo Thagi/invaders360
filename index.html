@@ -5,48 +5,92 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>360 Invaders Ver.2</title>
+  <title>360 Invaders Ver.3</title>
 </head>
 
 <body>
   <div id="app"></div>
   <div id="ui-layer">
     <!-- HUD -->
-    <div id="hud">
+    <div id="hud" style="display: none;">
       <div id="score">Score: 0</div>
       <div id="lives">Lives: ❤️❤️❤️</div>
       <div id="wave">Wave: 1</div>
       <div id="combo" style="display: none;">Combo: 0x</div>
       <div id="weapon">Weapon: Standard</div>
+      <div id="bombs">💣 💣 ⚫</div>
       <div id="powerups" style="display: none;"></div>
+      <div id="bomb-counter" class="hidden">
+        <div class="bomb-icon">💣</div>
+        <div class="bomb-charges"></div>
+      </div>
     </div>
+
+    <!-- Pause Button (fixed top-right) -->
+    <button id="pause-btn" class="hud-btn" style="display: none;">⏸️</button>
+
+    <!-- Boss Health Bar -->
+    <div id="boss-hp-bar" style="display: none;">
+      <div id="boss-name">STAGE BOSS</div>
+      <div id="boss-hp-container">
+        <div id="boss-hp-fill"></div>
+      </div>
+    </div>
+
+    <!-- Boss Warning -->
+    <div id="boss-warning" style="display: none;">⚠️ STAGE BOSS INCOMING! ⚠️</div>
+
+    <!-- Wave Message -->
+    <div id="wave-message" style="display: none;">WAVE COMPLETE!</div>
 
     <!-- Start Screen -->
     <div id="start-screen">
       <h1>360 INVADERS</h1>
-      <h2>Ver.2</h2>
+      <h2>Ver.3 Phase 1</h2>
       <p>Press SPACE to Start</p>
       <div class="instructions">
         <h3>Controls:</h3>
         <p>← → Arrow Keys: Rotate</p>
         <p>↑ ↓ Arrow Keys: Move Forward/Backward</p>
         <p>SPACE: Shoot</p>
-        <p>1/2/3: Switch Weapons</p>
-        <h3>New Features:</h3>
+        <p>Arrow Keys: Rotate / Move</p>
+        <p>Space: Shoot</p>
+        <p>1/2/3: Switch Weapon</p>
+        <p>B: Bomb (Requires Charge)</p>
+        <p>P / Esc: Pause</p>
+        <h3>Features:</h3>
         <p>❤️ 3 Lives System</p>
         <p>🌊 Progressive Waves</p>
-        <p>⚡ Power-Ups (Rapid Fire, Spread Shot, Shield, Speed, Score 2x)</p>
-        <p>🔥 Combo Multiplier System</p>
-        <p>🔫 Multiple Weapon Types</p>
+        <p>⚡ Power-Ups (5 Types)</p>
+        <p>🔥 Combo Multiplier</p>
+        <p>🔫 3 Weapon Types</p>
+        <p>👾 5 Diverse Enemy Types</p>
+        <p>💣 Special Bomb Ability</p>
+        <p>🦖 Stage Boss Every 5 Waves</p>
+      </div>
+    </div>
+
+    <!-- Pause Menu -->
+    <div id="pause-menu" class="overlay hidden">
+      <h1>PAUSED</h1>
+      <div class="menu-buttons">
+        <button id="resume-btn">RESUME</button>
+        <button id="home-btn-pause">BACK TO HOME</button>
       </div>
     </div>
 
     <!-- Game Over Screen -->
-    <div id="game-over-screen" class="hidden">
-      <h1>GAME OVER</h1>
-      <p id="final-score">Score: 0</p>
-      <div id="game-stats"></div>
-      <p>Press SPACE to Restart</p>
+    <div id="game-over-screen" class="overlay hidden">
+      <div class="game-over-content">
+        <h1>GAME OVER</h1>
+        <p>Score: <span id="final-score">0</span></p>
+        <p>Wave: <span id="final-wave">0</span></p>
+        <p>Max Combo: <span id="final-combo">0</span></p>
+        <div class="menu-buttons">
+          <button id="restart-btn">RESTART</button>
+          <button id="home-btn-over">BACK TO HOME</button>
+        </div>
+      </div>
     </div>
   </div>
   <script type="module" src="/src/main.js"></script>

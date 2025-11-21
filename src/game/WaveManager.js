@@ -10,11 +10,14 @@ export class WaveManager {
         this.waveTransitionTime = 0;
         this.transitionDuration = 3.0; // 3 seconds between waves
         this.inTransition = false;
+        this.isBossWave = false;
 
         // Wave configuration
         this.baseSpawnRate = 4.0;
         this.baseApproachSpeed = 1.0;
         this.baseBossInterval = 15.0;
+
+        this.justCompleted = false;
     }
 
     startNextWave() {
@@ -23,16 +26,25 @@ export class WaveManager {
         this.waveActive = true;
         this.inTransition = false;
 
-        // Calculate wave difficulty
-        const waveMultiplier = 1 + (this.currentWave - 1) * 0.2;
-        this.enemiesPerWave = Math.floor(10 + this.currentWave * 2);
+        // Check if this is a boss wave (every 5 waves)
+        this.isBossWave = (this.currentWave % 5 === 0);
 
-        // Update enemy manager settings
-        this.enemyManager.spawnRate = Math.max(0.5, this.baseSpawnRate - this.currentWave * 0.2);
-        this.enemyManager.approachSpeed = this.baseApproachSpeed + this.currentWave * 0.1;
-        this.enemyManager.bossSpawnRate = Math.max(8.0, this.baseBossInterval - this.currentWave * 0.5);
+        if (this.isBossWave) {
+            // Boss wave: 1 boss enemy
+            this.enemiesPerWave = 1;
+            console.log(`*** BOSS WAVE ${this.currentWave}! ***`);
+        } else {
+            // Calculate wave difficulty
+            const waveMultiplier = 1 + (this.currentWave - 1) * 0.2;
+            this.enemiesPerWave = Math.floor(10 + this.currentWave * 2);
 
-        console.log(`Wave ${this.currentWave} started! Enemies: ${this.enemiesPerWave}`);
+            // Update enemy manager settings
+            this.enemyManager.spawnRate = Math.max(0.5, this.baseSpawnRate - this.currentWave * 0.2);
+            this.enemyManager.approachSpeed = this.baseApproachSpeed + this.currentWave * 0.1;
+            this.enemyManager.bossSpawnRate = Math.max(8.0, this.baseBossInterval - this.currentWave * 0.5);
+
+            console.log(`Wave ${this.currentWave} started! Enemies: ${this.enemiesPerWave}`);
+        }
     }
 
     onEnemyKilled() {
@@ -50,7 +62,13 @@ export class WaveManager {
         this.waveActive = false;
         this.inTransition = true;
         this.waveTransitionTime = 0;
-        console.log(`Wave ${this.currentWave} completed!`);
+        this.justCompleted = true;
+
+        if (this.isBossWave) {
+            console.log(`*** BOSS WAVE ${this.currentWave} DEFEATED! ***`);
+        } else {
+            console.log(`Wave ${this.currentWave} completed!`);
+        }
     }
 
     update(dt) {
@@ -63,7 +81,8 @@ export class WaveManager {
     }
 
     getWaveBonus() {
-        return this.currentWave * 500; // 500 points per wave level
+        const baseBonus = this.currentWave * 500;
+        return this.isBossWave ? baseBonus * 2 : baseBonus;
     }
 
     isInTransition() {
@@ -72,5 +91,19 @@ export class WaveManager {
 
     getTransitionProgress() {
         return this.waveTransitionTime / this.transitionDuration;
+    }
+
+    isBossWaveActive() {
+        return this.isBossWave && this.waveActive;
+    }
+
+    reset() {
+        this.currentWave = 0;
+        this.enemiesKilled = 0;
+        this.waveActive = false;
+        this.inTransition = false;
+        this.waveTransitionTime = 0;
+        this.isBossWave = false;
+        this.justCompleted = false;
     }
 }

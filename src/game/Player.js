@@ -67,7 +67,8 @@ export class Player {
             right: false,
             up: false,
             down: false,
-            shoot: false
+            shoot: false,
+            bomb: false
         };
 
         this.setupInput();
@@ -85,6 +86,7 @@ export class Player {
                 case 'Digit1': this.currentWeapon = 'STANDARD'; break;
                 case 'Digit2': this.currentWeapon = 'MACHINE_GUN'; break;
                 case 'Digit3': this.currentWeapon = 'CANNON'; break;
+                case 'KeyB': this.keys.bomb = true; break;
             }
         });
 
@@ -95,6 +97,7 @@ export class Player {
                 case 'ArrowUp': this.keys.up = false; break;
                 case 'ArrowDown': this.keys.down = false; break;
                 case 'Space': this.keys.shoot = false; break;
+                case 'KeyB': this.keys.bomb = false; break;
             }
         });
     }
@@ -182,5 +185,21 @@ export class Player {
             this.radius * Math.sin(this.angle),
             0
         );
+    }
+
+    reset() {
+        // Reset position and rotation
+        this.angle = 0;
+        this.radius = 8;
+        this.mesh.position.x = this.radius;
+        this.pivot.rotation.z = 0;
+
+        // Reset invulnerability
+        this.invulnerable = false;
+        this.invulnerabilityTime = 0;
+        this.mesh.visible = true;
+
+        // Reset weapon
+        this.currentWeapon = 'STANDARD';
     }
 }
