@@ -25,7 +25,7 @@ export class TunnelBackground {
     }
 
     createRingGeometry() {
-        const innerRadius = 0.95;
+        const innerRadius = 0.99; // Thinner rings (was 0.95)
         const outerRadius = 1.0;
         const segments = 64;
         return new THREE.RingGeometry(innerRadius, outerRadius, segments);

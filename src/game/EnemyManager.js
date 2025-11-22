@@ -92,22 +92,42 @@ export class EnemyManager {
         this.bossMaterial = new THREE.MeshBasicMaterial({ color: 0xffaa00, wireframe: true });
 
         this.bossSpawnRate = 5.0; // Seconds
+        this.bossSpawnRate = 5.0; // Seconds
         this.lastBossSpawnTime = 0;
+        this.gameMode = 'CLASSIC';
+    }
+
+    setMode(mode) {
+        this.gameMode = mode;
     }
 
     spawn(type = null) {
         // Weighted random selection if no type specified
         if (!type) {
             const rand = Math.random();
-            if (rand < 0.20) type = 'normal';          // 20%
-            else if (rand < 0.35) type = 'speed';      // 15%
-            else if (rand < 0.45) type = 'tank';       // 10%
-            else if (rand < 0.55) type = 'shooter';    // 10%
-            else if (rand < 0.63) type = 'splitter';   // 8%
-            else if (rand < 0.71) type = 'zigzag';     // 8%
-            else if (rand < 0.81) type = 'kamikaze';   // 10%
-            else if (rand < 0.91) type = 'shield';     // 10%
-            else type = 'teleport';                    // 9%
+            if (this.gameMode === 'TIME_ATTACK') {
+                // More aggressive mix for Time Attack
+                if (rand < 0.10) type = 'normal';          // 10%
+                else if (rand < 0.25) type = 'speed';      // 15%
+                else if (rand < 0.35) type = 'tank';       // 10%
+                else if (rand < 0.60) type = 'shooter';    // 25% (Increased from 10%)
+                else if (rand < 0.65) type = 'splitter';   // 5%
+                else if (rand < 0.75) type = 'zigzag';     // 10%
+                else if (rand < 0.85) type = 'kamikaze';   // 10%
+                else if (rand < 0.90) type = 'shield';     // 5%
+                else type = 'teleport';                    // 10%
+            } else {
+                // Standard mix
+                if (rand < 0.20) type = 'normal';          // 20%
+                else if (rand < 0.35) type = 'speed';      // 15%
+                else if (rand < 0.45) type = 'tank';       // 10%
+                else if (rand < 0.55) type = 'shooter';    // 10%
+                else if (rand < 0.63) type = 'splitter';   // 8%
+                else if (rand < 0.71) type = 'zigzag';     // 8%
+                else if (rand < 0.81) type = 'kamikaze';   // 10%
+                else if (rand < 0.91) type = 'shield';     // 10%
+                else type = 'teleport';                    // 9%
+            }
         }
 
         const enemyDef = this.enemyTypes[type];
@@ -135,7 +155,7 @@ export class EnemyManager {
             speed: enemyDef.speed,
             score: enemyDef.score,
             shootTimer: 0,
-            shootInterval: 2.0,
+            shootInterval: (type === 'shooter' && this.gameMode === 'TIME_ATTACK') ? 0.8 : 2.0, // Much faster shooting in Time Attack
             zigzagPhase: Math.random() * Math.PI * 2
         };
 
@@ -261,7 +281,7 @@ export class EnemyManager {
                 }
 
                 // Shoot at player
-                if (enemy.stopped && player) {
+                if (player) {
                     enemy.shootTimer += dt;
                     if (enemy.shootTimer >= enemy.shootInterval) {
                         const playerPos = player.getPosition();

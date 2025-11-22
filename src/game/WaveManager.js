@@ -17,7 +17,14 @@ export class WaveManager {
         this.baseApproachSpeed = 1.0;
         this.baseBossInterval = 15.0;
 
+        this.baseBossInterval = 15.0;
+
         this.justCompleted = false;
+        this.gameMode = 'CLASSIC'; // Default mode
+    }
+
+    setMode(mode) {
+        this.gameMode = mode;
     }
 
     startNextWave() {
@@ -36,14 +43,22 @@ export class WaveManager {
         } else {
             // Calculate wave difficulty
             const waveMultiplier = 1 + (this.currentWave - 1) * 0.2;
-            this.enemiesPerWave = Math.floor(10 + this.currentWave * 2);
 
-            // Update enemy manager settings
-            this.enemyManager.spawnRate = Math.max(0.5, this.baseSpawnRate - this.currentWave * 0.2);
-            this.enemyManager.approachSpeed = this.baseApproachSpeed + this.currentWave * 0.1;
+            if (this.gameMode === 'TIME_ATTACK') {
+                // Harder difficulty for Time Attack
+                this.enemiesPerWave = Math.floor(30 + this.currentWave * 5); // Significantly more enemies
+                this.enemyManager.spawnRate = Math.max(0.2, this.baseSpawnRate - this.currentWave * 0.4); // Very fast spawns
+                this.enemyManager.approachSpeed = this.baseApproachSpeed + this.currentWave * 0.2; // Faster enemies
+            } else {
+                // Classic / Survival difficulty
+                this.enemiesPerWave = Math.floor(10 + this.currentWave * 2);
+                this.enemyManager.spawnRate = Math.max(0.5, this.baseSpawnRate - this.currentWave * 0.2);
+                this.enemyManager.approachSpeed = this.baseApproachSpeed + this.currentWave * 0.1;
+            }
+
             this.enemyManager.bossSpawnRate = Math.max(8.0, this.baseBossInterval - this.currentWave * 0.5);
 
-            console.log(`Wave ${this.currentWave} started! Enemies: ${this.enemiesPerWave}`);
+            console.log(`Wave ${this.currentWave} started! Enemies: ${this.enemiesPerWave} (Mode: ${this.gameMode})`);
         }
     }
 

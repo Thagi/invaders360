@@ -17,6 +17,11 @@ import { ObstacleManager } from './ObstacleManager.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+export const GameMode = {
+    CLASSIC: 'CLASSIC',
+    TIME_ATTACK: 'TIME_ATTACK',
+    SURVIVAL: 'SURVIVAL'
+};
 
 export class Game {
     constructor() {
@@ -117,6 +122,13 @@ export class Game {
         this.cameraShake = { x: 0, y: 0, intensity: 0, duration: 0 }; // Screen shake
         this.useTunnel = true; // Toggle tunnel background
 
+        // Game Mode State
+        this.currentMode = GameMode.CLASSIC;
+        this.timeAttackDuration = 180; // 3 minutes in seconds
+        this.timeAttackTimer = 0;
+
+        this.initModeSelection();
+
         this.inputCooldown = 0;
         this.isDying = false; // Flag for death animation
 
@@ -131,22 +143,63 @@ export class Game {
             if (e.code === 'Space') {
                 e.preventDefault(); // Prevent page scroll
                 if (!this.isPlaying && document.getElementById('game-over-screen').classList.contains('hidden')) {
-                    // Start Game
-                    document.getElementById('start-screen').classList.add('hidden');
-                    this.start();
+                    // Show Mode Selection
+                    // document.getElementById('start-screen').classList.add('hidden'); // Keep start screen visible behind mode select
+                    document.getElementById('mode-select-screen').style.display = 'flex';
                 } else if (!this.isPlaying && !document.getElementById('game-over-screen').classList.contains('hidden')) {
-                    // Restart Game
-                    this.restart();
+                    // Restart Game (Go to mode select or restart same mode? Let's go to mode select for now)
+                    document.getElementById('game-over-screen').classList.add('hidden');
+                    document.getElementById('mode-select-screen').style.display = 'flex';
                 }
             }
-            if (e.code === 'KeyB') {
-                this.checkBombActivation();
-            }
             if (e.code === 'KeyP' || e.code === 'Escape') {
+                const modeScreen = document.getElementById('mode-select-screen');
+                if (modeScreen.style.display === 'flex') {
+                    modeScreen.style.display = 'none';
+                    return;
+                }
                 this.togglePause();
             }
         });
     }
+
+    initModeSelection() {
+        const modeButtons = document.querySelectorAll('.mode-btn');
+        const modeScreen = document.getElementById('mode-select-screen');
+        const gameUI = document.getElementById('game-ui');
+
+        modeButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent bubbling
+                const mode = btn.dataset.mode;
+                this.startGame(mode);
+                document.getElementById('start-screen').classList.add('hidden'); // Hide start screen now
+                modeScreen.style.display = 'none';
+                gameUI.style.display = 'block';
+            });
+        });
+    }
+
+    startGame(mode) {
+        this.currentMode = mode;
+        this.waveManager.setMode(mode); // Pass mode to WaveManager
+        this.enemyManager.setMode(mode); // Pass mode to EnemyManager
+        this.reset(); // Reset first to clear state
+
+        // Mode specific setup overrides
+        if (this.currentMode === GameMode.SURVIVAL) {
+            this.lives = 1; // One hit death
+            this.updateLives();
+        } else if (this.currentMode === GameMode.TIME_ATTACK) {
+            this.timeAttackTimer = this.timeAttackDuration;
+            document.getElementById('timer-display').style.display = 'block';
+        } else {
+            document.getElementById('timer-display').style.display = 'none';
+        }
+
+        this.start();
+    }
+
 
     setupUIEventListeners() {
         // Pause Button (HUD)
@@ -197,6 +250,11 @@ export class Game {
     }
 
     restart() {
+        this.reset();
+        this.start();
+    }
+
+    reset() {
         // Reset game state
         this.score = 0;
         this.lives = 3;
@@ -248,7 +306,7 @@ export class Game {
         this.isDying = false;
         this.cameraShake = { x: 0, y: 0, intensity: 0, duration: 0 };
 
-        this.start();
+
     }
 
     start() {
@@ -307,6 +365,16 @@ export class Game {
         const time = this.clock.getElapsedTime();
 
         // Update game logic here
+
+        // Mode Specific Updates
+        if (this.currentMode === GameMode.TIME_ATTACK && this.isPlaying) {
+            this.timeAttackTimer -= delta;
+            this.updateTimerDisplay();
+            if (this.timeAttackTimer <= 0) {
+                this.gameOver();
+            }
+        }
+
         // Calculate effective delta for time slow
         const timeSlowActive = this.powerUpManager.hasTimeSlow();
         const effectiveDelta = timeSlowActive ? delta * 0.5 : delta;
@@ -362,7 +430,8 @@ export class Game {
                 }
 
                 // Recover life
-                if (this.lives < this.maxLives) {
+                // Recover life (Skip in Survival Mode)
+                if (this.currentMode !== GameMode.SURVIVAL && this.lives < this.maxLives) {
                     this.lives++;
                     this.updateLives();
                     this.soundManager.playSound('powerup'); // Use powerup sound for life gain
@@ -447,6 +516,15 @@ export class Game {
 
         // this.renderer.render(this.scene, this.camera);
         this.composer.render();
+    }
+
+    updateTimerDisplay() {
+        const timerDisplay = document.getElementById('timer-display');
+        if (timerDisplay) {
+            const minutes = Math.floor(this.timeAttackTimer / 60);
+            const seconds = Math.floor(this.timeAttackTimer % 60);
+            timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
     }
 
     resetToHome() {
