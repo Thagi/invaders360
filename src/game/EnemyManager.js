@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import { polarToCartesian } from '../utils/math.js';
 
 export class EnemyManager {
-    constructor(scene, bulletManager) {
+    constructor(scene, bulletManager, laserManager) {
         this.scene = scene;
         this.bulletManager = bulletManager;
+        this.laserManager = laserManager;
         this.enemies = [];
         this.spawnRate = 4.0; // Seconds between spawns (was 2.0)
         this.lastSpawnTime = 0;
@@ -85,13 +86,20 @@ export class EnemyManager {
                 speed: 0.8,
                 score: 300,
                 size: 1.2
+            },
+            laser: {
+                geometry: new THREE.BoxGeometry(1, 3, 1),
+                material: new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true }), // Magenta
+                hp: 3,
+                speed: 0.5,
+                score: 400,
+                size: 1.5
             }
         };
 
         this.bossGeometry = new THREE.BoxGeometry(4, 4, 4);
         this.bossMaterial = new THREE.MeshBasicMaterial({ color: 0xffaa00, wireframe: true });
 
-        this.bossSpawnRate = 5.0; // Seconds
         this.bossSpawnRate = 5.0; // Seconds
         this.lastBossSpawnTime = 0;
         this.gameMode = 'CLASSIC';
@@ -110,35 +118,36 @@ export class EnemyManager {
                 if (rand < 0.10) type = 'normal';          // 10%
                 else if (rand < 0.25) type = 'speed';      // 15%
                 else if (rand < 0.35) type = 'tank';       // 10%
-                else if (rand < 0.60) type = 'shooter';    // 25% (Increased from 10%)
+                else if (rand < 0.60) type = 'shooter';    // 25%
                 else if (rand < 0.65) type = 'splitter';   // 5%
                 else if (rand < 0.75) type = 'zigzag';     // 10%
                 else if (rand < 0.85) type = 'kamikaze';   // 10%
                 else if (rand < 0.90) type = 'shield';     // 5%
-                else type = 'teleport';                    // 10%
+                else if (rand < 0.95) type = 'teleport';   // 5%
+                else type = 'laser';                       // 5%
             } else {
                 // Standard mix
-                if (rand < 0.20) type = 'normal';          // 20%
-                else if (rand < 0.35) type = 'speed';      // 15%
-                else if (rand < 0.45) type = 'tank';       // 10%
-                else if (rand < 0.55) type = 'shooter';    // 10%
-                else if (rand < 0.63) type = 'splitter';   // 8%
-                else if (rand < 0.71) type = 'zigzag';     // 8%
-                else if (rand < 0.81) type = 'kamikaze';   // 10%
-                else if (rand < 0.91) type = 'shield';     // 10%
-                else type = 'teleport';                    // 9%
+                if (rand < 0.15) type = 'normal';          // 15%
+                else if (rand < 0.30) type = 'speed';      // 15%
+                else if (rand < 0.40) type = 'tank';       // 10%
+                else if (rand < 0.50) type = 'shooter';    // 10%
+                else if (rand < 0.58) type = 'splitter';   // 8%
+                else if (rand < 0.66) type = 'zigzag';     // 8%
+                else if (rand < 0.74) type = 'kamikaze';   // 8%
+                else if (rand < 0.82) type = 'shield';     // 8%
+                else if (rand < 0.90) type = 'teleport';   // 8%
+                else type = 'laser';                       // 10%
             }
         }
 
+        const angle = Math.random() * Math.PI * 2;
         const enemyDef = this.enemyTypes[type];
         if (!enemyDef) {
             console.error(`Unknown enemy type: ${type}`);
             return;
         }
 
-        const angle = Math.random() * Math.PI * 2;
         const mesh = new THREE.Mesh(enemyDef.geometry, enemyDef.material);
-
         const pos = polarToCartesian(this.spawnRadius, angle);
         mesh.position.set(pos.x, pos.y, 0);
 
@@ -191,6 +200,12 @@ export class EnemyManager {
         if (type === 'teleport') {
             enemy.teleportTimer = 5.0;
             enemy.teleportInterval = 5.0;
+        }
+
+        // Laser-specific: shooting interval
+        if (type === 'laser') {
+            enemy.stopRadius = 30; // Stops further away
+            enemy.shootInterval = 2.0; // Shoot every 2 seconds
         }
 
         this.enemies.push(enemy);
@@ -337,6 +352,22 @@ export class EnemyManager {
                         enemy.shieldRing.rotation.z = enemy.shieldAngle - enemy.angle;
                     }
                 }
+            } else if (enemy.type === 'laser') {
+                // Laser enemy behavior: moves to range and shoots laser projectiles
+                if (enemy.radius > enemy.stopRadius) {
+                    enemy.radius -= this.approachSpeed * enemy.speed * dt;
+                }
+
+                // Shoot laser projectiles at player
+                if (player) {
+                    enemy.shootTimer += dt;
+                    if (enemy.shootTimer >= enemy.shootInterval) {
+                        const playerPos = player.getPosition();
+                        // Shoot elongated laser projectile
+                        this.bulletManager.shootLaser(enemy.mesh.position, playerPos);
+                        enemy.shootTimer = 0;
+                    }
+                }
             } else if (enemy.type === 'teleport') {
                 // Teleport: normal movement but teleports randomly
                 enemy.radius -= this.approachSpeed * enemy.speed * dt;
@@ -378,15 +409,19 @@ export class EnemyManager {
             if (enemy.type === 'boss' && player) {
                 enemy.shootTimer += dt;
                 if (enemy.shootTimer > enemy.shootInterval) {
-                    // Calculate player position (approximate based on radius and angle)
-                    // Player is at radius 8, angle player.angle
                     const playerPos = player.getPosition();
                     const targetPos = new THREE.Vector3(playerPos.x, playerPos.y, 0);
 
-                    this.bulletManager.shootAt(enemy.mesh.position, targetPos);
+                    // 30% chance to fire homing missile, otherwise normal bullet
+                    if (Math.random() < 0.3) {
+                        this.bulletManager.shootHomingMissile(enemy.mesh.position, targetPos);
+                    } else {
+                        this.bulletManager.shootAt(enemy.mesh.position, targetPos);
+                    }
                     enemy.shootTimer = 0;
                 }
             }
+
 
             // Remove if too close (Game Over condition usually, but just remove for now)
             if (enemy.radius < 2) {
@@ -401,9 +436,12 @@ export class EnemyManager {
         const index = this.enemies.indexOf(enemy);
         if (index > -1) {
             this.scene.remove(enemy.mesh);
+            if (enemy.mesh.geometry) enemy.mesh.geometry.dispose();
+            if (enemy.mesh.material) enemy.mesh.material.dispose();
 
-            // Dispose unique resources
-            if (enemy.type === 'shield' && enemy.shieldRing) {
+            // Shield specific cleanup
+            if (enemy.shieldRing) {
+                this.scene.remove(enemy.shieldRing);
                 if (enemy.shieldRing.geometry) enemy.shieldRing.geometry.dispose();
                 if (enemy.shieldRing.material) enemy.shieldRing.material.dispose();
             }

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { TunnelBackground } from './TunnelBackground.js';
 import { UpgradeManager } from './UpgradeManager.js';
+import { LaserManager } from './LaserManager.js'; // Import LaserManager
 import { Player } from './Player.js';
 
 import { BulletManager } from './BulletManager.js';
@@ -14,6 +15,7 @@ import { StageBoss } from './StageBoss.js';
 import { SoundManager } from './SoundManager.js';
 import { BackgroundManager } from './BackgroundManager.js';
 import { ObstacleManager } from './ObstacleManager.js';
+import { LeaderboardManager } from './LeaderboardManager.js'; // Import LeaderboardManager
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
@@ -81,8 +83,11 @@ export class Game {
         this.scene.add(this.boundaryMesh);
         this.boundaryMesh = this.boundaryMesh;
 
-        this.bulletManager = new BulletManager(this.scene);
-        this.enemyManager = new EnemyManager(this.scene, this.bulletManager);
+        // Initialize player first for bulletManager reference
+        this.player = new Player(this.scene); // Initialize without bulletManager first
+        this.bulletManager = new BulletManager(this.scene, this.player); // Pass player for homing missiles
+        this.laserManager = new LaserManager(this.scene); // Initialize LaserManager
+        this.enemyManager = new EnemyManager(this.scene, this.bulletManager, this.laserManager); // Pass to EnemyManager
         this.particleManager = new ParticleManager(this.scene);
         this.powerUpManager = new PowerUpManager(this.scene);
         this.comboManager = new ComboManager();
@@ -91,9 +96,11 @@ export class Game {
         this.backgroundManager = new BackgroundManager(this.scene);
         this.tunnelBackground = new TunnelBackground(this.scene);
         this.obstacleManager = new ObstacleManager(this.scene);
-        this.player = new Player(this.scene, this.bulletManager);
+        // Set bulletManager reference for player after bulletManager is created
+        this.player.bulletManager = this.bulletManager;
         this.upgradeManager = new UpgradeManager(this.player, this);
         this.waveManager = new WaveManager(this.enemyManager);
+        this.leaderboardManager = new LeaderboardManager(); // Initialize LeaderboardManager
         this.stageBoss = null; // Current stage boss
 
         // Game state
@@ -164,6 +171,7 @@ export class Game {
     }
 
     initModeSelection() {
+        console.log('Initializing Mode Selection');
         const modeButtons = document.querySelectorAll('.mode-btn');
         const modeScreen = document.getElementById('mode-select-screen');
         const gameUI = document.getElementById('game-ui');
@@ -177,7 +185,51 @@ export class Game {
                 modeScreen.style.display = 'none';
                 gameUI.style.display = 'block';
             });
+
+            // Show leaderboard on hover
+            btn.addEventListener('mouseenter', () => {
+                const mode = btn.dataset.mode;
+                console.log(`Hovered mode: ${mode}, updating leaderboard`);
+                this.updateLeaderboardDisplay(mode);
+            });
         });
+
+        // Initial leaderboard load (Classic)
+        console.log('Loading initial leaderboard for CLASSIC');
+        this.updateLeaderboardDisplay(GameMode.CLASSIC);
+    }
+
+    async updateLeaderboardDisplay(mode) {
+        const container = document.getElementById('leaderboard-container');
+        const list = document.getElementById('leaderboard-list');
+
+        if (!container || !list) {
+            console.error('Leaderboard UI elements not found!');
+            return;
+        }
+
+        container.classList.remove('hidden');
+        list.innerHTML = 'Loading...';
+
+        const scores = await this.leaderboardManager.fetchTopScores(mode);
+        console.log(`Leaderboard scores for ${mode}:`, scores);
+
+        if (scores.length === 0) {
+            list.innerHTML = 'No scores yet.';
+            return;
+        }
+
+        let html = '';
+        scores.forEach((entry, index) => {
+            const rankClass = index < 3 ? `rank-${index + 1}` : '';
+            html += `
+                <div class="leaderboard-row ${rankClass}">
+                    <span>${index + 1}. ${entry.player_name}</span>
+                    <span>${entry.score.toLocaleString()}</span>
+                </div>
+            `;
+        });
+        list.innerHTML = html;
     }
 
     startGame(mode) {
@@ -262,6 +314,11 @@ export class Game {
         this.updateLives();
         document.getElementById('game-over-screen').classList.add('hidden');
 
+        // Reset Time Attack timer if in TIME_ATTACK mode
+        if (this.currentMode === GameMode.TIME_ATTACK) {
+            this.timeAttackTimer = this.timeAttackDuration;
+        }
+
         // Reset upgrades
         if (this.upgradeManager) this.upgradeManager.reset();
 
@@ -271,6 +328,9 @@ export class Game {
 
         // Clear bullets
         this.bulletManager.clear();
+
+        // Clear lasers
+        this.laserManager.clear();
 
         // Clear power-ups
         this.powerUpManager.clear();
@@ -538,6 +598,7 @@ export class Game {
         this.powerUpManager.clear();
         if (this.particleManager) this.particleManager.clear();
         if (this.obstacleManager) this.obstacleManager.clear();
+        if (this.laserManager) this.laserManager.clear(); // Clear lasers
         this.comboManager.reset();
         this.specialAbility.reset();
 
@@ -559,6 +620,7 @@ export class Game {
         document.getElementById('game-over-screen').classList.add('hidden');
         document.getElementById('pause-menu').classList.add('hidden');
         document.getElementById('start-screen').classList.remove('hidden');
+        document.getElementById('leaderboard-container').classList.add('hidden'); // Initially hidden, shown in mode select
 
         const bossHp = document.getElementById('boss-hp-bar');
         if (bossHp) bossHp.style.display = 'none';
@@ -568,6 +630,10 @@ export class Game {
 
         const waveMsg = document.getElementById('wave-message');
         if (waveMsg) waveMsg.style.display = 'none';
+
+        // Hide timer display (for Time Attack mode)
+        const timerDisplay = document.getElementById('timer-display');
+        if (timerDisplay) timerDisplay.style.display = 'none';
 
         // Reset player
         if (this.player) this.player.reset();
@@ -909,15 +975,136 @@ export class Game {
         }
     }
 
-    gameOver() {
+    async gameOver() {
         this.isPlaying = false;
-        this.inputCooldown = 2.0; // 2 seconds cooldown before restart allowed
-        document.getElementById('game-over-screen').classList.remove('hidden');
+        this.isDying = true; // Stop player updates but keep rendering for death animation
+        this.clock.stop();
 
-        // Update game over stats
-        document.getElementById('final-score').innerText = this.score;
-        document.getElementById('final-wave').innerText = this.waveManager.currentWave;
-        document.getElementById('final-combo').innerText = this.comboManager.getMaxCombo();
+        // Show Game Over Screen
+        const gameOverScreen = document.getElementById('game-over-screen');
+        gameOverScreen.classList.remove('hidden');
+
+        document.getElementById('final-score').textContent = this.score;
+        document.getElementById('final-wave').textContent = this.waveManager.currentWave;
+        document.getElementById('final-combo').textContent = this.comboManager.maxCombo + 'x';
+
+        // Hide HUD
+        document.getElementById('hud').style.display = 'none';
+        document.getElementById('boss-hp-bar').style.display = 'none';
+        document.getElementById('pause-btn').style.display = 'none';
+        document.getElementById('timer-display').style.display = 'none';
+
+        // Leaderboard Integration
+        const rankDisplay = document.getElementById('rank-display');
+        const submitBtn = document.getElementById('submit-score-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const homeBtn = document.getElementById('home-btn-over');
+
+        // Reset UI state
+        if (rankDisplay) rankDisplay.classList.add('hidden');
+        if (submitBtn) submitBtn.classList.add('hidden');
+
+        // Fetch Rank
+        if (this.leaderboardManager.isEnabled) {
+            console.log('Fetching rank for score:', this.score);
+            const rank = await this.leaderboardManager.getRank(this.score, this.currentMode);
+            console.log('Rank fetched:', rank);
+
+            if (rank) {
+                if (rankDisplay) {
+                    document.getElementById('final-rank').textContent = rank;
+                    rankDisplay.classList.remove('hidden');
+                }
+                if (submitBtn) {
+                    submitBtn.classList.remove('hidden');
+                    // Setup submission button
+                    submitBtn.onclick = () => {
+                        this.showSubmissionDialog(rank);
+                    };
+                }
+            }
+        } else {
+            console.log('LeaderboardManager is disabled. Skipping rank fetch.');
+        }
+
+        // Setup restart buttons
+        restartBtn.onclick = () => {
+            this.restart();
+        };
+
+        homeBtn.onclick = () => {
+            this.resetToHome();
+        };
+    }
+
+    showSubmissionDialog(rank) {
+        document.getElementById('game-over-screen').classList.add('hidden');
+        const dialog = document.getElementById('submission-dialog');
+        dialog.classList.remove('hidden');
+        document.getElementById('submission-rank').textContent = rank;
+
+        document.getElementById('confirm-submit-btn').onclick = () => {
+            dialog.classList.add('hidden');
+            this.showNameEntry();
+        };
+
+        document.getElementById('decline-submit-btn').onclick = () => {
+            dialog.classList.add('hidden');
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        };
+    }
+
+    showNameEntry() {
+        const overlay = document.getElementById('name-entry-overlay');
+        overlay.classList.remove('hidden');
+        const nameDisplay = document.getElementById('name-display');
+        const keyboardGrid = document.getElementById('keyboard-grid');
+        let currentName = '';
+
+        // Generate Keyboard
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        keyboardGrid.innerHTML = '';
+
+        chars.split('').forEach(char => {
+            const btn = document.createElement('button');
+            btn.className = 'key-btn';
+            btn.textContent = char;
+            btn.onclick = () => {
+                if (currentName.length < 6) {
+                    currentName += char;
+                    nameDisplay.textContent = currentName.padEnd(6, '_');
+                }
+            };
+            keyboardGrid.appendChild(btn);
+        });
+
+        // Add DEL button
+        const delBtn = document.createElement('button');
+        delBtn.className = 'key-btn action-key';
+        delBtn.textContent = 'DEL';
+        delBtn.onclick = () => {
+            currentName = currentName.slice(0, -1);
+            nameDisplay.textContent = currentName.padEnd(6, '_');
+        };
+        keyboardGrid.appendChild(delBtn);
+
+        // Add END button
+        const endBtn = document.createElement('button');
+        endBtn.className = 'key-btn action-key';
+        endBtn.textContent = 'END';
+        endBtn.onclick = async () => {
+            if (currentName.length > 0) {
+                overlay.classList.add('hidden');
+                await this.leaderboardManager.submitScore(currentName, this.score, this.currentMode);
+                this.resetToHome(); // Go back to home to see leaderboard
+            }
+        };
+        keyboardGrid.appendChild(endBtn);
+
+        document.getElementById('cancel-submit-btn').onclick = () => {
+            overlay.classList.add('hidden');
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        };
     }
 
     activateBomb() {
@@ -1062,7 +1249,7 @@ export class Game {
                 bossHpBar.style.display = 'block';
                 if (bossHpFill) {
                     const hpPercent = this.stageBoss.getHPPercent() * 100;
-                    bossHpFill.style.width = `${hpPercent}%`;
+                    bossHpFill.style.width = `${hpPercent}% `;
 
                     // Color based on phase
                     if (this.stageBoss.phase === 3) {
