@@ -39,7 +39,9 @@ export class BulletManager {
         });
     }
 
-    fire(position, velocity, isEnemy = false, color = 0xffff00, damage = 1, size = 0.5) {
+    fire(position, velocity, isEnemy = false, color = 0xffff00, damage = 1, size = 0.5,
+        isHoming = false, homingStrength = 0.05, piercing = false, maxPierce = 3,
+        explosive = false, explosionRadius = 3, explosionDamage = 0.5) {
         const material = isEnemy ? this.enemyMaterial : new THREE.MeshBasicMaterial({ color: color });
         const mesh = new THREE.Mesh(this.baseGeometry, material);
         mesh.scale.set(size, size, size);
@@ -56,7 +58,15 @@ export class BulletManager {
             velocity, // Vector3
             isEnemy,
             life: 3.0, // Seconds to live
-            damage
+            damage,
+            isHoming: isHoming,
+            homingStrength: homingStrength,
+            piercing: piercing,
+            maxPierce: maxPierce,
+            pierceCount: 0,
+            explosive: explosive,
+            explosionRadius: explosionRadius,
+            explosionDamage: explosionDamage
         });
     }
 

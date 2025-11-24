@@ -197,6 +197,9 @@ export class Game {
         // Initial leaderboard load (Classic)
         console.log('Loading initial leaderboard for CLASSIC');
         this.updateLeaderboardDisplay(GameMode.CLASSIC);
+
+        // Start menu music
+        this.soundManager.startMusic('menu');
     }
 
     async updateLeaderboardDisplay(mode) {
@@ -243,11 +246,16 @@ export class Game {
             this.lives = 1; // One hit death
             this.updateLives();
         } else if (this.currentMode === GameMode.TIME_ATTACK) {
+            // Time attack starts with timer
             this.timeAttackTimer = this.timeAttackDuration;
             document.getElementById('timer-display').style.display = 'block';
         } else {
             document.getElementById('timer-display').style.display = 'none';
         }
+
+        // Start game music
+        this.soundManager.stopMusic();
+        this.soundManager.startMusic('game');
 
         this.start();
     }
@@ -733,7 +741,7 @@ export class Game {
                     }
                 }
 
-                // Simple distance check
+                //Simple distance check
                 const dist = bulletPos.distanceTo(enemyPos);
                 if (dist < (enemy.size || 1) + 0.5) { // Dynamic size check
                     // Hit!
@@ -741,10 +749,39 @@ export class Game {
                     this.particleManager.createExplosion(enemyPos, enemy.type === 'boss' ? 0xffaa00 : 0xff0000, 5);
                     this.soundManager.playSound('damage');
 
-                    // Remove bullet
-                    this.scene.remove(bullet.mesh);
-                    // Geometry is shared, do not dispose
-                    bullets.splice(i, 1);
+                    // Handle explosive bullets (Plasma)
+                    if (bullet.explosive) {
+                        // Create explosion effect
+                        this.particleManager.createExplosion(bulletPos, bullet.mesh.material.color.getHex(), 20);
+
+                        // Damage nearby enemies
+                        const explosionRadius = bullet.explosionRadius || 3;
+                        const explosionDamage = bullet.explosionDamage || 0.5;
+
+                        for (const nearbyEnemy of enemies) {
+                            if (nearbyEnemy === enemy) continue; // Skip the direct hit enemy
+                            const distToExplosion = nearbyEnemy.mesh.position.distanceTo(bulletPos);
+                            if (distToExplosion < explosionRadius) {
+                                nearbyEnemy.hp -= explosionDamage;
+                                this.particleManager.createExplosion(nearbyEnemy.mesh.position, 0xff00ff, 5);
+                            }
+                        }
+                    }
+
+                    // Handle piercing bullets (Railgun)
+                    if (bullet.piercing) {
+                        bullet.pierceCount = (bullet.pierceCount || 0) + 1;
+                        // Only remove bullet if it has pierced max times
+                        if (bullet.pierceCount >= (bullet.maxPierce || 3)) {
+                            this.scene.remove(bullet.mesh);
+                            bullets.splice(i, 1);
+                        }
+                        // Continue to next enemy without breaking (allow piercing)
+                    } else {
+                        // Normal bullet - remove after hit
+                        this.scene.remove(bullet.mesh);
+                        bullets.splice(i, 1);
+                    }
 
                     if (enemy.hp <= 0) {
                         // Enemy destroyed
@@ -787,7 +824,10 @@ export class Game {
                         }
                     }
 
-                    break; // Bullet hit something, stop checking this bullet
+                    // Only break if bullet is not piercing (non-piercing bullets stop after hit)
+                    if (!bullet.piercing) {
+                        break;
+                    }
                 }
             }
         }
@@ -987,6 +1027,9 @@ export class Game {
         document.getElementById('final-score').textContent = this.score;
         document.getElementById('final-wave').textContent = this.waveManager.currentWave;
         document.getElementById('final-combo').textContent = this.comboManager.maxCombo + 'x';
+
+        // Stop game music
+        this.soundManager.stopMusic();
 
         // Hide HUD
         document.getElementById('hud').style.display = 'none';
@@ -1219,11 +1262,23 @@ export class Game {
 
     handleBossWave() {
         if (this.waveManager.isBossWaveActive() && !this.stageBoss) {
+            console.log('Boss Wave starting...');
             // Spawn Boss
             this.stageBoss = new StageBoss(this.scene, this.bulletManager, this.waveManager.currentWave);
             this.soundManager.playSound('bossWarning');
+            // Start boss music and background
+            this.soundManager.stopMusic(); // Stop any current music
             this.soundManager.startMusic('boss');
             this.backgroundManager.setBossMode(true);
+
+            // Hide leaderboard when game starts
+            const leaderboardContainer = document.getElementById('leaderboard-container');
+            if (leaderboardContainer) {
+                leaderboardContainer.classList.add('hidden');
+            }
+
+            this.soundManager.stopMusic();
+            this.soundManager.startMusic('game');
 
             // Show boss warning
             const warningEl = document.getElementById('boss-warning');

@@ -94,6 +94,48 @@ export class EnemyManager {
                 speed: 0.5,
                 score: 400,
                 size: 1.5
+            },
+            healer: {
+                geometry: new THREE.TorusGeometry(1, 0.4, 8, 8),
+                material: new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true }), // Green
+                hp: 2,
+                speed: 0.7,
+                score: 500,
+                size: 1.2,
+                healRange: 5,
+                healAmount: 1,
+                healCooldown: 2.0
+            },
+            phantom: {
+                geometry: new THREE.TetrahedronGeometry(1.3, 1),
+                material: new THREE.MeshBasicMaterial({ color: 0x8800ff, wireframe: true, transparent: true, opacity: 0.5 }),
+                hp: 1,
+                speed: 1.5,
+                score: 350,
+                size: 1.3,
+                teleportCooldown: 3.0,
+                teleportInvulnerability: 0.2
+            },
+            mimic: {
+                geometry: new THREE.DodecahedronGeometry(1.1, 0),
+                material: new THREE.MeshBasicMaterial({ color: 0xffcc00, wireframe: true }), // Yellow
+                hp: 3,
+                speed: 1.0,
+                score: 400,
+                size: 1.1,
+                decoyCount: 2,
+                canSplitOnDamage: true
+            },
+            miner: {
+                geometry: new THREE.BoxGeometry(2, 2, 2),
+                material: new THREE.MeshBasicMaterial({ color: 0x996633, wireframe: true }), // Brown
+                hp: 4,
+                speed: 0.6,
+                score: 450,
+                size: 1.5,
+                mineCooldown: 4.0,
+                mineExplosionRadius: 2.5,
+                mineExplosionDamage: 1
             }
         };
 
@@ -115,28 +157,36 @@ export class EnemyManager {
             const rand = Math.random();
             if (this.gameMode === 'TIME_ATTACK') {
                 // More aggressive mix for Time Attack
-                if (rand < 0.10) type = 'normal';          // 10%
-                else if (rand < 0.25) type = 'speed';      // 15%
-                else if (rand < 0.35) type = 'tank';       // 10%
-                else if (rand < 0.60) type = 'shooter';    // 25%
-                else if (rand < 0.65) type = 'splitter';   // 5%
-                else if (rand < 0.75) type = 'zigzag';     // 10%
-                else if (rand < 0.85) type = 'kamikaze';   // 10%
-                else if (rand < 0.90) type = 'shield';     // 5%
-                else if (rand < 0.95) type = 'teleport';   // 5%
-                else type = 'laser';                       // 5%
+                if (rand < 0.08) type = 'normal';          // 8%
+                else if (rand < 0.18) type = 'speed';      // 10%
+                else if (rand < 0.26) type = 'tank';       // 8%
+                else if (rand < 0.42) type = 'shooter';    // 16%
+                else if (rand < 0.48) type = 'splitter';   // 6%
+                else if (rand < 0.56) type = 'zigzag';     // 8%
+                else if (rand < 0.66) type = 'kamikaze';   // 10%
+                else if (rand < 0.72) type = 'shield';     // 6%
+                else if (rand < 0.78) type = 'teleport';   // 6%
+                else if (rand < 0.84) type = 'laser';      // 6%
+                else if (rand < 0.88) type = 'healer';     // 4%
+                else if (rand < 0.92) type = 'phantom';    // 4%
+                else if (rand < 0.96) type = 'mimic';      // 4%
+                else type = 'miner';                       // 4%
             } else {
                 // Standard mix
-                if (rand < 0.15) type = 'normal';          // 15%
-                else if (rand < 0.30) type = 'speed';      // 15%
-                else if (rand < 0.40) type = 'tank';       // 10%
-                else if (rand < 0.50) type = 'shooter';    // 10%
-                else if (rand < 0.58) type = 'splitter';   // 8%
-                else if (rand < 0.66) type = 'zigzag';     // 8%
-                else if (rand < 0.74) type = 'kamikaze';   // 8%
-                else if (rand < 0.82) type = 'shield';     // 8%
-                else if (rand < 0.90) type = 'teleport';   // 8%
-                else type = 'laser';                       // 10%
+                if (rand < 0.12) type = 'normal';          // 12%
+                else if (rand < 0.24) type = 'speed';      // 12%
+                else if (rand < 0.33) type = 'tank';       // 9%
+                else if (rand < 0.42) type = 'shooter';    // 9%
+                else if (rand < 0.50) type = 'splitter';   // 8%
+                else if (rand < 0.58) type = 'zigzag';     // 8%
+                else if (rand < 0.66) type = 'kamikaze';   // 8%
+                else if (rand < 0.73) type = 'shield';     // 7%
+                else if (rand < 0.80) type = 'teleport';   // 7%
+                else if (rand < 0.86) type = 'laser';      // 6%
+                else if (rand < 0.90) type = 'healer';     // 4%
+                else if (rand < 0.94) type = 'phantom';    // 4%
+                else if (rand < 0.97) type = 'mimic';      // 3%
+                else type = 'miner';                       // 3%
             }
         }
 
@@ -206,6 +256,37 @@ export class EnemyManager {
         if (type === 'laser') {
             enemy.stopRadius = 30; // Stops further away
             enemy.shootInterval = 2.0; // Shoot every 2 seconds
+        }
+
+        // Healer-specific: healing timer
+        if (type === 'healer') {
+            enemy.healTimer = 0;
+            enemy.healCooldown = enemyDef.healCooldown;
+            enemy.healRange = enemyDef.healRange;
+            enemy.healAmount = enemyDef.healAmount;
+        }
+
+        // Phantom-specific: teleport abilities
+        if (type === 'phantom') {
+            enemy.teleportTimer = 0;
+            enemy.teleportCooldown = enemyDef.teleportCooldown;
+            enemy.teleportInvulnerability = enemyDef.teleportInvulnerability;
+            enemy.isInvulnerable = false;
+            enemy.invulnerabilityTimer = 0;
+        }
+
+        // Mimic-specific: split tracking
+        if (type === 'mimic') {
+            enemy.hasSpawnedDecoys = false;
+            enemy.decoyCount = enemyDef.decoyCount;
+        }
+
+        // Miner-specific: mine deployment timer
+        if (type === 'miner') {
+            enemy.mineTimer = 0;
+            enemy.mineCooldown = enemyDef.mineCooldown;
+            enemy.mineExplosionRadius = enemyDef.mineExplosionRadius;
+            enemy.mineExplosionDamage = enemyDef.mineExplosionDamage;
         }
 
         this.enemies.push(enemy);
@@ -386,6 +467,64 @@ export class EnemyManager {
                             enemy.mesh.material.opacity = 0.7;
                         }
                     }, 100);
+                }
+            } else if (enemy.type === 'healer') {
+                // Healer: stays at mid-range and heals nearby damaged allies
+                const targetRadius = 20;
+                if (enemy.radius > targetRadius + 2) {
+                    enemy.radius -= this.approachSpeed * enemy.speed * dt;
+                } else if (enemy.radius < targetRadius - 2) {
+                    enemy.radius += this.approachSpeed * enemy.speed * dt * 0.5;
+                }
+
+                enemy.healTimer += dt;
+                if (enemy.healTimer >= enemy.healCooldown) {
+                    for (const ally of this.enemies) {
+                        if (ally === enemy || ally.type === 'healer') continue;
+                        const dist = enemy.mesh.position.distanceTo(ally.mesh.position);
+                        if (dist < enemy.healRange && ally.hp < ally.maxHp) {
+                            ally.hp = Math.min(ally.maxHp, ally.hp + enemy.healAmount);
+                            break;
+                        }
+                    }
+                    enemy.healTimer = 0;
+                }
+            } else if (enemy.type === 'phantom') {
+                // Phantom: teleports and has brief invulnerability
+                enemy.radius -= this.approachSpeed * enemy.speed * dt;
+
+                if (enemy.isInvulnerable) {
+                    enemy.invulnerabilityTimer -= dt;
+                    if (enemy.invulnerabilityTimer <= 0) {
+                        enemy.isInvulnerable = false;
+                        enemy.mesh.material.opacity = 0.5;
+                    }
+                }
+
+                enemy.teleportTimer += dt;
+                if (enemy.teleportTimer >= enemy.teleportCooldown) {
+                    enemy.angle = Math.random() * Math.PI * 2;
+                    enemy.radius = 15 + Math.random() * 20;
+                    enemy.teleportTimer = 0;
+                    enemy.isInvulnerable = true;
+                    enemy.invulnerabilityTimer = enemy.teleportInvulnerability;
+                    enemy.mesh.material.opacity = 0.2;
+                }
+            } else if (enemy.type === 'mimic') {
+                // Mimic: spawns decoys when damaged
+                enemy.radius -= this.approachSpeed * enemy.speed * dt;
+                if (!enemy.hasSpawnedDecoys && enemy.hp < enemy.maxHp) {
+                    enemy.hasSpawnedDecoys = true;
+                }
+            } else if (enemy.type === 'miner') {
+                // Miner: deploys stationary mines
+                const targetRadius = 25;
+                if (enemy.radius > targetRadius) {
+                    enemy.radius -= this.approachSpeed * enemy.speed * dt;
+                }
+                enemy.mineTimer += dt;
+                if (enemy.mineTimer >= enemy.mineCooldown) {
+                    enemy.mineTimer = 0;
                 }
             }
 

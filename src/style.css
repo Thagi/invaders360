@@ -590,3 +590,9 @@ p {
   text-align: center;
   pointer-events: auto;
 }
+
+.small-text {
+  font-size: 14px;
+  color: #aaaaaa;
+  margin-top: -5px;
+}

@@ -39,6 +39,46 @@ export class Player {
                 bulletSpeed: 35,
                 bulletSize: 0.3,
                 color: 0xffff00
+            },
+            MISSILE: {
+                name: 'Missile',
+                cooldown: 0.6,
+                damage: 2.0,
+                bulletSpeed: 15,
+                bulletSize: 0.6,
+                color: 0xff8800, // Orange
+                homing: true
+            },
+            RAILGUN: {
+                name: 'Railgun',
+                cooldown: 1.0,
+                damage: 3.0,
+                bulletSpeed: 100, // Very fast
+                bulletSize: 0.3,
+                color: 0x00ffff, // Cyan
+                piercing: true,
+                maxPierce: 5
+            },
+            SHOTGUN: {
+                name: 'Shotgun',
+                cooldown: 0.8,
+                damage: 0.5,
+                bulletSpeed: 28,
+                bulletSize: 0.35,
+                count: 8,
+                spread: 0.4,
+                color: 0xff0000 // Red
+            },
+            PLASMA: {
+                name: 'Plasma',
+                cooldown: 0.8,
+                damage: 1.5,
+                bulletSpeed: 20,
+                bulletSize: 0.7,
+                color: 0xff00ff, // Purple
+                explosive: true,
+                explosionRadius: 3,
+                explosionDamage: 0.5
             }
         };
 
@@ -95,8 +135,12 @@ export class Player {
                 case 'ArrowDown': this.keys.down = true; break;
                 case 'Space': this.keys.shoot = true; break;
                 case 'Digit1': this.currentWeapon = 'STANDARD'; break;
-                case 'Digit2': this.currentWeapon = 'MACHINE_GUN'; break;
-                case 'Digit3': this.currentWeapon = 'CANNON'; break;
+                case 'Digit2': this.currentWeapon = 'SCATTER'; break;
+                case 'Digit3': this.currentWeapon = 'RAPID'; break;
+                case 'Digit4': this.currentWeapon = 'MISSILE'; break;
+                case 'Digit5': this.currentWeapon = 'RAILGUN'; break;
+                case 'Digit6': this.currentWeapon = 'SHOTGUN'; break;
+                case 'Digit7': this.currentWeapon = 'PLASMA'; break;
                 case 'KeyB': this.keys.bomb = true; break;
             }
         });
@@ -191,11 +235,11 @@ export class Player {
         const damage = weapon.damage * this.damageMultiplier;
         const size = weapon.bulletSize * this.bulletSizeMultiplier;
 
-        if (weapon.name === 'Scatter') {
-            // Scatter shot logic
+        // Handle spread weapons (Scatter and Shotgun)
+        if (weapon.name === 'Scatter' || weapon.name === 'Shotgun') {
             for (let i = 0; i < weapon.count; i++) {
                 const spreadAngle = (i - (weapon.count - 1) / 2) * weapon.spread;
-                const bulletAngle = this.angle + spreadAngle; // Shoot outward + spread
+                const bulletAngle = this.angle + spreadAngle;
 
                 const velocity = new THREE.Vector3(
                     Math.cos(bulletAngle) * weapon.bulletSpeed,
@@ -206,28 +250,62 @@ export class Player {
                 this.bulletManager.fire(
                     this.mesh.position.clone(),
                     velocity,
-                    false, // isEnemy
+                    false,
                     weapon.color,
                     damage,
                     size
                 );
             }
         } else {
-            // Single shot logic
-            const bulletAngle = this.angle; // Shoot outward
+            // Single shot logic (Standard, Rapid, Missile, Railgun, Plasma)
+            const bulletAngle = this.angle;
             const velocity = new THREE.Vector3(
                 Math.cos(bulletAngle) * weapon.bulletSpeed,
                 Math.sin(bulletAngle) * weapon.bulletSpeed,
                 0
             );
 
+            const bulletData = {
+                position: this.mesh.position.clone(),
+                velocity: velocity,
+                isEnemy: false,
+                color: weapon.color,
+                damage: damage,
+                size: size
+            };
+
+            // Add special properties for new weapons
+            if (weapon.homing) {
+                bulletData.isHoming = true;
+                bulletData.homingStrength = 0.05;
+            }
+
+            if (weapon.piercing) {
+                bulletData.piercing = true;
+                bulletData.maxPierce = weapon.maxPierce || 3;
+                bulletData.pierceCount = 0;
+            }
+
+            if (weapon.explosive) {
+                bulletData.explosive = true;
+                bulletData.explosionRadius = weapon.explosionRadius || 3;
+                bulletData.explosionDamage = weapon.explosionDamage || 0.5;
+            }
+
             this.bulletManager.fire(
-                this.mesh.position.clone(),
-                velocity,
-                false, // isEnemy
-                weapon.color,
-                damage,
-                size
+                bulletData.position,
+                bulletData.velocity,
+                bulletData.isEnemy,
+                bulletData.color,
+                bulletData.damage,
+                bulletData.size,
+                bulletData.isHoming,
+                bulletData.homingStrength,
+                bulletData.piercing,
+                bulletData.maxPierce,
+                bulletData.explosive,
+                bulletData.explosionRadius,
+                bulletData.explosionDamage
             );
         }
     }

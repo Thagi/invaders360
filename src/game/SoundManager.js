@@ -278,8 +278,7 @@ export class SoundManager {
         // Stop current music if playing
         this.stopMusic();
 
-        // Create simple background music using oscillators
-        // This is a placeholder - in production you'd load audio files
+        // Create background music based on type
         this.createBackgroundMusic(type);
     }
 
@@ -288,50 +287,178 @@ export class SoundManager {
 
         const ctx = this.audioContext;
 
-        // Simple ambient drone
-        const oscillator1 = ctx.createOscillator();
-        const oscillator2 = ctx.createOscillator();
-        const gainNode = ctx.createGain();
+        if (type === 'menu') {
+            // Menu music: Calm and ambient
+            this.createMenuMusic(ctx);
+        } else if (type === 'game') {
+            // Game music: Energetic and driving
+            this.createGameMusic(ctx);
+        } else if (type === 'boss') {
+            // Boss music: Intense and dramatic
+            this.createBossMusic(ctx);
+        }
+    }
+
+    createMenuMusic(ctx) {
+        // Simple arpeggio pattern - Cmaj7 (C-E-G-B)
+        const notes = [261.63, 329.63, 392.00, 493.88]; // C4, E4, G4, B4
+        const noteIndex = { value: 0 };
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
         const filter = ctx.createBiquadFilter();
 
-        oscillator1.connect(filter);
-        oscillator2.connect(filter);
-        filter.connect(gainNode);
-        gainNode.connect(ctx.destination);
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
 
-        if (type === 'game') {
-            oscillator1.frequency.value = 110; // A2
-            oscillator2.frequency.value = 165; // E3
-        } else if (type === 'boss') {
-            oscillator1.frequency.value = 130; // C3
-            oscillator2.frequency.value = 196; // G3
+        osc.type = 'sine';
+        filter.type = 'lowpass';
+        filter.frequency.value = 1500;
+        gain.gain.value = this.musicVolume * this.masterVolume * 0.1;
+
+        // Play arpeggio
+        const playNote = () => {
+            if (!this.musicSource) return;
+            osc.frequency.setValueAtTime(notes[noteIndex.value], ctx.currentTime);
+            noteIndex.value = (noteIndex.value + 1) % notes.length;
+            setTimeout(playNote, 400); // BPM 60
+        };
+
+        osc.start();
+        playNote();
+
+        this.musicSource = { osc, gain };
+    }
+
+    createGameMusic(ctx) {
+        // Game music: Bass line + lead melody
+        const bassNotes = [130.81, 146.83, 164.81, 146.83]; // C3, D3, E3, D3
+        const leadNotes = [523.25, 587.33, 659.25, 587.33]; // C5, D5, E5, D5
+        const noteIndex = { value: 0 };
+
+        // Bass oscillator
+        const bass = ctx.createOscillator();
+        const bassGain = ctx.createGain();
+        bass.connect(bassGain);
+        bassGain.connect(ctx.destination);
+        bass.type = 'sawtooth';
+        bassGain.gain.value = this.musicVolume * this.masterVolume * 0.12;
+
+        // Lead oscillator
+        const lead = ctx.createOscillator();
+        const leadGain = ctx.createGain();
+        const leadFilter = ctx.createBiquadFilter();
+        lead.connect(leadFilter);
+        leadFilter.connect(leadGain);
+        leadGain.connect(ctx.destination);
+        lead.type = 'square';
+        leadFilter.type = 'lowpass';
+        leadFilter.frequency.value = 2000;
+        leadGain.gain.value = this.musicVolume * this.masterVolume * 0.08;
+
+        // Play pattern
+        const playPattern = () => {
+            if (!this.musicSource) return;
+            const idx = noteIndex.value;
+            bass.frequency.setValueAtTime(bassNotes[idx], ctx.currentTime);
+            lead.frequency.setValueAtTime(leadNotes[idx], ctx.currentTime);
+            noteIndex.value = (noteIndex.value + 1) % bassNotes.length;
+            setTimeout(playPattern, 300); // BPM 120
+        };
+
+        bass.start();
+        lead.start();
+        playPattern();
+
+        this.musicSource = { bass, lead, bassGain, leadGain };
+    }
+
+    createBossMusic(ctx) {
+        // Boss music: Aggressive with drums (noise)
+        const drumNotes = [65.41, 73.42, 82.41]; // C2, D2, E2
+        const leadNotes = [261.63, 293.66, 329.63]; // C4, D4, E4
+        const noteIndex = { value: 0 };
+
+        // Bass/drum noise
+        const bufferSize = ctx.sampleRate * 0.05;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
         }
 
-        oscillator1.type = 'sine';
-        oscillator2.type = 'sine';
+        const playDrum = () => {
+            if (!this.musicSource) return;
+            const noise = ctx.createBufferSource();
+            const noiseGain = ctx.createGain();
+            const noiseFilter = ctx.createBiquadFilter();
 
-        filter.type = 'lowpass';
-        filter.frequency.value = 800;
+            noise.buffer = buffer;
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(ctx.destination);
 
-        gainNode.gain.setValueAtTime(0, ctx.currentTime);
-        gainNode.gain.linearRampToValueAtTime(this.musicVolume * this.masterVolume * 0.15, ctx.currentTime + 1.0);
+            noiseFilter.type = 'lowpass';
+            noiseFilter.frequency.value = 200;
+            noiseGain.gain.setValueAtTime(this.musicVolume * this.masterVolume * 0.15, ctx.currentTime);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
 
-        oscillator1.start();
-        oscillator2.start();
+            noise.start();
+            noise.stop(ctx.currentTime + 0.05);
 
-        this.musicSource = { oscillator1, oscillator2, gainNode };
+            setTimeout(playDrum, 250); // Fast drums
+        };
+
+        // Lead melody
+        const lead = ctx.createOscillator();
+        const leadGain = ctx.createGain();
+        lead.connect(leadGain);
+        leadGain.connect(ctx.destination);
+        lead.type = 'sawtooth';
+        leadGain.gain.value = this.musicVolume * this.masterVolume * 0.1;
+
+        const playLead = () => {
+            if (!this.musicSource) return;
+            const idx = noteIndex.value;
+            lead.frequency.setValueAtTime(leadNotes[idx], ctx.currentTime);
+            noteIndex.value = (noteIndex.value + 1) % leadNotes.length;
+            setTimeout(playLead, 250);
+        };
+
+        lead.start();
+        playDrum();
+        playLead();
+
+        this.musicSource = { lead, leadGain, drumTimer: true };
     }
 
     stopMusic() {
         if (this.musicSource) {
             const ctx = this.audioContext;
+
+            // Fade out
             if (this.musicSource.gainNode) {
                 this.musicSource.gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
             }
+            if (this.musicSource.bassGain) {
+                this.musicSource.bassGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
+            }
+            if (this.musicSource.leadGain) {
+                this.musicSource.leadGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
+            }
+            if (this.musicSource.gain) {
+                this.musicSource.gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
+            }
+
             setTimeout(() => {
                 if (this.musicSource) {
+                    // Stop all oscillators
                     this.musicSource.oscillator1?.stop();
                     this.musicSource.oscillator2?.stop();
+                    this.musicSource.osc?.stop();
+                    this.musicSource.bass?.stop();
+                    this.musicSource.lead?.stop();
                     this.musicSource = null;
                 }
             }, 600);
