@@ -1,14 +1,14 @@
 # Supabase セットアップ手順書 (リーダーボード機能用)
 
 ## 概要
-INVADERS 360のハイスコア保存機能（リーダーボード）のバックエンドとして、Supabaseを利用するためのセットアップ手順です。
+Polygon Spiralのハイスコア保存機能（リーダーボード）のバックエンドとして、Supabaseを利用するためのセットアップ手順です。
 
 ## 1. Supabaseプロジェクトの作成
 
 1. [Supabase](https://supabase.com/) にアクセスし、アカウントを作成またはログインします。
 2. "New Project" をクリックします。
 3. 以下の情報を入力してプロジェクトを作成します：
-   - **Name**: `invaders360-leaderboard` (任意)
+   - **Name**: `polygon-spiral-leaderboard` (任意)
    - **Database Password**: 強力なパスワードを設定（忘れないように保存してください）
    - **Region**: ユーザーに近いリージョン（例: `Tokyo`）
 4. プロジェクトが作成されるまで数分待ちます。

@@ -1,7 +1,7 @@
 # GitHub Pages デプロイ手順
 
 ## 概要
-このドキュメントでは、INVADERS 360 ゲームをGitHub Pagesで公開するための手順を説明します。
+このドキュメントでは、Polygon Spiral ゲームをGitHub Pagesで公開するための手順を説明します。
 
 ## 前提条件
 - GitHubアカウントを持っていること
@@ -210,4 +210,4 @@ npm run deploy
 
 ## まとめ
 
-これでINVADERS 360がGitHub Pagesで公開されました！URLを共有して、世界中の人にゲームを楽しんでもらいましょう。
+これでPolygon SpiralがGitHub Pagesで公開されました！URLを共有して、世界中の人にゲームを楽しんでもらいましょう。
